@@ -5,7 +5,8 @@ from bson import ObjectId
 from flask import Blueprint, abort, current_app, flash, redirect, render_template, request, session, url_for
 from flask_login import UserMixin, current_user, login_required, login_user, logout_user
 
-from app.extensions import bcrypt, cache, db, github, google, limiter, login_manager
+from app.extensions import bcrypt, cache, db, github, google, limiter, login_manager, mail
+from flask_mail import Message
 from app.leaderboard.cache import invalidate_leaderboard_cache
 from app.profile.sync_service import clear_profile_caches
 from app.utils import utc_now
@@ -158,6 +159,9 @@ def login():
         password = request.form.get("password")
         user_doc = db.user.find_one({"email": email})
         if user_doc and user_doc.get("password") and password and bcrypt.check_password_hash(user_doc["password"], password):
+            if user_doc.get("is_verified") is False:
+                flash("Please verify your email before logging in. Check your inbox.", "warning")
+                return redirect(url_for("auth.login"))
             user_doc = reactivate_user_if_needed(user_doc)
             login_user(UserWrapper(user_doc))
             flash(f"Welcome back, {user_doc.get('name', 'User')}! 👋", "success")
@@ -195,6 +199,7 @@ def register():
             return redirect(url_for("auth.register"))
 
         hashed_password = bcrypt.generate_password_hash(password).decode("utf-8")
+        verification_token = secrets.token_urlsafe(32)
         try:
             db.user.insert_one(
                 {
@@ -204,13 +209,36 @@ def register():
                     "progress": {},
                     "is_admin": False,
                     "created_at": utc_now(),
+                    "is_verified": False,
+                    "verification_token": verification_token,
                 }
             )
-            flash("Your account has been created! You can now log in.", "success")
+            verify_url = url_for("auth.verify_email", token=verification_token, _external=True)
+            if not current_app.config.get("MAIL_USERNAME"):
+                print(f"[DEV] Verify URL: {verify_url}")
+            else:
+                msg = Message("Verify Your Account", recipients=[email])
+                msg.html = render_template("verify_email.html", verify_url=verify_url, email=email)
+                mail.send(msg)
+                
+            flash("Account created! Please check your email to verify your account.", "success")
             return redirect(url_for("auth.login"))
-        except Exception:
+        except Exception as e:
             flash("An error occurred during registration.", "danger")
     return render_template("register.html")
+
+@auth_bp.route("/verify-email/<token>")
+def verify_email(token):
+    user_doc = db.user.find_one({"verification_token": token})
+    if user_doc and not user_doc.get("is_verified", True):
+        db.user.update_one(
+            {"_id": user_doc["_id"]},
+            {"$set": {"is_verified": True}, "$unset": {"verification_token": ""}}
+        )
+        flash("Email verified! You can now log in.", "success")
+    else:
+        flash("Invalid or expired verification link.", "danger")
+    return redirect(url_for("auth.login"))
 
 
 @auth_bp.route("/logout", methods=["POST"])
