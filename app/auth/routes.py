@@ -48,15 +48,16 @@ def resolve_oauth_user(provider_field, provider_id, name, email=None):
         return user_doc, "linked"
 
     result = db.user.insert_one(
-        {
-            "name": name,
-            "email": email,
-            provider_field: provider_id,
-            "progress": {},
-            "is_admin": False,
-            "created_at": utc_now(),
-        }
-    )
+    {
+        "name": name,
+        "email": email,
+        provider_field: provider_id,
+        "progress": {},
+        "profile_visibility": "public",
+        "is_admin": False,
+        "created_at": utc_now(),
+    }
+)
     user_doc = db.user.find_one({"_id": result.inserted_id})
     return user_doc, "created"
 

@@ -43,6 +43,25 @@ def test_profile_updates_reject_non_text_values():
 
     assert updates is None
     assert error == 'headline must be text'
+def test_profile_updates_accept_valid_profile_visibility():
+    updates, error = build_profile_updates({"profile_visibility": "stats_only"})
+
+    assert error is None
+    assert updates == {"profile_visibility": "stats_only"}
+
+
+def test_profile_updates_normalize_profile_visibility():
+    updates, error = build_profile_updates({"profile_visibility": "  PRIVATE  "})
+
+    assert error is None
+    assert updates == {"profile_visibility": "private"}
+
+
+def test_profile_updates_reject_invalid_profile_visibility():
+    updates, error = build_profile_updates({"profile_visibility": "friends_only"})
+
+    assert updates is None
+    assert error == "profile_visibility must be one of: public, private, stats_only"
 
 
 def test_edit_profile_rejects_missing_json_body(monkeypatch):

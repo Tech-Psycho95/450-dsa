@@ -471,7 +471,18 @@
     <div style="margin-bottom:10px"><label class="m-lbl"><i class="bi bi-twitter-x"></i> Twitter / X URL</label><input class="m-inp" id="ep_twitter" placeholder="https://twitter.com/username" value="{{ user.twitter_url or '' }}"></div>
     <div style="margin-bottom:10px"><label class="m-lbl"><i class="bi bi-globe" style="color:var(--info)"></i> Website / Portfolio</label><input class="m-inp" id="ep_website" placeholder="https://yoursite.com" value="{{ user.website_url or '' }}"></div>
     <div style="margin-bottom:16px"><label class="m-lbl"><i class="bi bi-file-earmark-person" style="color:var(--accent)"></i> Resume URL</label><input class="m-inp" id="ep_resume" placeholder="https://drive.google.com/... or LinkedIn resume link" value="{{ user.resume_url or '' }}"><div style="font-size:.7rem;color:var(--text-muted);margin-top:3px">Paste a Google Drive, Dropbox, or any public resume link</div></div>
-    </div><!-- end scrollable body -->
+    <div style="margin-bottom:16px">
+  <label class="m-lbl"><i class="bi bi-shield-lock" style="color:var(--accent)"></i> Profile Visibility</label>
+  <select class="m-inp" id="ep_profile_visibility">
+    <option value="public" {% if (user.profile_visibility or 'public') == 'public' %}selected{% endif %}>Public - show full profile</option>
+    <option value="private" {% if user.profile_visibility == 'private' %}selected{% endif %}>Private - hide public profile</option>
+    <option value="stats_only" {% if user.profile_visibility == 'stats_only' %}selected{% endif %}>Stats Only - show only progress stats</option>
+  </select>
+  <div style="font-size:.7rem;color:var(--text-muted);margin-top:3px">
+    Control what other users can see on your public profile page.
+  </div>
+</div>
+  </div><!-- end scrollable body -->
     <div style="flex-shrink:0;display:flex;justify-content:flex-end;gap:10px;padding:14px 24px;border-top:1px solid var(--border-color)">
       <button class="m-cancel" onclick="closeEditProfile()">Cancel</button>
       <button class="m-save" id="btnSaveProfile" onclick="handleSaveProfile(this)"><span id="saveProfileContent" style="display:inline-flex;align-items:center;gap:6px"><i class="bi bi-check2-circle"></i> Save Profile</span></button>
@@ -578,16 +589,17 @@ const csrfToken = {{ csrf_token()|tojson }};
 window.handleSaveProfile = function(btn){
   const contentEl=document.getElementById('saveProfileContent');
   const payload={
-    name: document.getElementById('ep_name').value,
-    bio: document.getElementById('ep_bio').value,
-    headline: document.getElementById('ep_headline').value,
-    location: document.getElementById('ep_location').value,
-    college: document.getElementById('ep_college').value,
-    linkedin_url: document.getElementById('ep_linkedin').value,
-    twitter_url: document.getElementById('ep_twitter').value,
-    website_url: document.getElementById('ep_website').value,
-    resume_url: document.getElementById('ep_resume').value,
-  };
+  name: document.getElementById('ep_name').value,
+  bio: document.getElementById('ep_bio').value,
+  headline: document.getElementById('ep_headline').value,
+  location: document.getElementById('ep_location').value,
+  college: document.getElementById('ep_college').value,
+  linkedin_url: document.getElementById('ep_linkedin').value,
+  twitter_url: document.getElementById('ep_twitter').value,
+  website_url: document.getElementById('ep_website').value,
+  resume_url: document.getElementById('ep_resume').value,
+  profile_visibility: document.getElementById('ep_profile_visibility').value,
+};
   window.setButtonBusyState(btn, contentEl, { busy: true, busyLabel: 'Saving...' });
   fetch(endpointConfig.editProfile,{method:'POST',headers:{'Content-Type':'application/json','X-CSRFToken':csrfToken},body:JSON.stringify(payload)})
     .then(r=>r.json())
