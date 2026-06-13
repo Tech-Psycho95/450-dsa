@@ -99,3 +99,26 @@ def test_registration_creates_unverified_user(monkeypatch):
     assert user["is_verified"] is False
     assert user["verification_token"] is not None
     assert len(user["verification_token"]) > 0
+
+
+def test_resend_verification_updates_token(monkeypatch):
+    flask_app, test_db = build_test_app(monkeypatch)
+    monkeypatch.setattr(auth_routes, "db", test_db)
+
+    _create_user(test_db, "resend@example.com", "Password123!", is_verified=False, verification_token="old-token")
+
+    with flask_app.test_client() as client:
+        headers = csrf_headers(client)
+        response = client.post(
+            "/resend-verification",
+            data={"email": "resend@example.com"},
+            headers=headers,
+        )
+
+    assert response.status_code == 302
+    assert response.location == "/login"
+
+    user = test_db.user.find_one({"email": "resend@example.com"})
+    assert user is not None
+    assert user["verification_token"] != "old-token"
+    assert user["verification_token"]
