@@ -159,8 +159,13 @@ def create_app(config_class=None):
         db.topic.create_index("name", unique=True)
         db.topic.create_index("position")
         db.question.create_index("topic")
-        _dedupe_seeded_questions()
-        db.question.create_index([("topic", 1), ("problem", 1), ("url", 1)], unique=True)
+        
+        try:
+            db.question.create_index([("topic", 1), ("problem", 1), ("url", 1)], unique=True)
+        except Exception:
+            _dedupe_seeded_questions()
+            db.question.create_index([("topic", 1), ("problem", 1), ("url", 1)], unique=True)
+            
         db.question.create_index([("problem", "text")], name="problem_text")
         db.cohort.create_index("join_code", unique=True)
         db.cohort_membership.create_index([("cohort_id", 1), ("user_id", 1)], unique=True)
@@ -176,7 +181,7 @@ def create_app(config_class=None):
     def init_db():
         with data_path.open("r", encoding="utf-8") as file_obj:
             data = json.load(file_obj)
-        if not all(hasattr(collection, "update_one") for collection in (db.topic, db.question)):
+        if not all(hasattr(collection, "bulk_write") for collection in (db.topic, db.question)):
             if db.topic.count_documents({}) == 0:
                 for topic in data:
                     result = db.topic.insert_one({"name": topic["topicName"], "position": topic["position"]})
@@ -199,17 +204,27 @@ def create_app(config_class=None):
                         db.question.insert_many(questions)
             return
 
+        from pymongo import UpdateOne
+        topic_updates = []
         for topic in data:
-            db.topic.update_one(
-                {"name": topic["topicName"]},
-                {"$set": {"position": topic["position"]}},
-                upsert=True,
+            topic_updates.append(
+                UpdateOne(
+                    {"name": topic["topicName"]},
+                    {"$set": {"position": topic["position"]}},
+                    upsert=True,
+                )
             )
-            topic_doc = db.topic.find_one({"name": topic["topicName"]})
-            if not topic_doc:
+        if topic_updates:
+            db.topic.bulk_write(topic_updates)
+
+        topic_docs = {doc["name"]: doc["_id"] for doc in db.topic.find({}, {"name": 1})}
+        
+        question_updates = []
+        for topic in data:
+            topic_id = topic_docs.get(topic["topicName"])
+            if not topic_id:
                 continue
 
-            topic_id = topic_doc["_id"]
             for question in topic["questions"]:
                 difficulty = question.get("difficulty", "Medium")
                 set_fields = {
@@ -219,17 +234,21 @@ def create_app(config_class=None):
                 }
                 if "hints" in question:
                     set_fields["hints"] = question["hints"]
-                db.question.update_one(
-                    {
-                        "topic": topic_id,
-                        "problem": question["Problem"],
-                        "url": question["URL"],
-                    },
-                    {
-                        "$set": set_fields
-                    },
-                    upsert=True,
+                question_updates.append(
+                    UpdateOne(
+                        {
+                            "topic": topic_id,
+                            "problem": question["Problem"],
+                            "url": question["URL"],
+                        },
+                        {
+                            "$set": set_fields
+                        },
+                        upsert=True,
+                    )
                 )
+        if question_updates:
+            db.question.bulk_write(question_updates)
 
     def _precompute_static_data(app):
         """Precompute static question/topic metadata and store in app config."""
