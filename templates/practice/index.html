@@ -1,0 +1,1201 @@
+{% extends "base.html" %}
+
+{% block head %}
+<!-- custom drag-divider — no external split library needed -->
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.36.1/min/vs/loader.min.js"></script>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+<style>
+/* ─────────────────────────────────────────────
+   RESET & TOKENS  (exact LeetCode dark palette)
+───────────────────────────────────────────── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+:root{
+  /* backgrounds */
+  --lc-page:    #1a1a1a;     /* outer page bg */
+  --lc-panel:   #282828;     /* panel / pane bg */
+  --lc-nav:     #1a1a1a;     /* top navbar */
+  --lc-hover:   #3e3e3e;     /* hover row bg */
+  --lc-input:   #333;        /* input / code bg */
+  --lc-sidebar: #1a1a1a;     /* sidebar bg */
+
+  /* borders */
+  --lc-border:  #3e3e3e;
+  --lc-border2: #4a4a4a;     /* slightly lighter */
+
+  /* text */
+  --lc-t1: #eff1f6;          /* primary */
+  --lc-t2: #bfbfbf;          /* secondary */
+  --lc-t3: #8c8c8c;          /* muted */
+
+  /* accent */
+  --lc-green:   #2cbb5d;
+  --lc-green2:  #00b8a3;     /* teal accent (LeetCode "accepted") */
+  --lc-orange:  #ef4743;     /* run btn */
+  --lc-yellow:  #ffb800;     /* medium badge */
+  --lc-red:     #ff375f;     /* hard badge */
+  --lc-easy:    #00b8a3;     /* easy badge teal */
+
+  /* misc */
+  --lc-r:  6px;
+  --lc-r2: 4px;
+  --font:  -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+  --mono:  "JetBrains Mono","Fira Code","Cascadia Code",Menlo,Consolas,monospace;
+}
+
+/* ─── CRITICAL: kill every base-layout offset ─── */
+/*
+  base.html applies:
+    .sidebar      { position:fixed; width:64px }   → left strip
+    .topbar       { position:fixed; height:56px }  → top strip
+    .main-wrapper { margin-left:64px; margin-top:56px } → THE REAL GAP
+  We must zero all of them.
+*/
+.sidebar,
+.topbar,
+.mobile-header,
+.skip-link,
+footer,
+.footer,
+#toastContainer,
+.flash-messages { display: none !important; }
+
+/* Zero out the shell margins left by base.html */
+.main-wrapper {
+  margin-left:  0 !important;
+  margin-top:   0 !important;
+  padding:      0 !important;
+  min-height:   0 !important;
+  height:       100vh !important;
+  overflow:     hidden !important;
+  display:      flex !important;
+  flex-direction: column !important;
+  background:   var(--lc-page) !important;
+}
+
+/* html/body baseline */
+html { height:100%; overflow:hidden; }
+body {
+  overflow: hidden;
+  height: 100vh;
+  background: var(--lc-page) !important;
+  color: var(--lc-t1);
+  font-family: var(--font);
+  font-size: 14px;
+  line-height: 1.5;
+  /* Kill any bootstrap/base margin or padding */
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* scrollbars */
+::-webkit-scrollbar { width:6px; height:6px; }
+::-webkit-scrollbar-track { background:transparent; }
+::-webkit-scrollbar-thumb { background:#4a4a4a; border-radius:3px; }
+::-webkit-scrollbar-thumb:hover { background:#666; }
+
+a { color:inherit; text-decoration:none; }
+button { font-family:var(--font); cursor:pointer; }
+select { font-family:var(--font); }
+
+/* ─────────────────────────────────────────────
+   TOP NAV  (exact LeetCode: 44px, dark #1a1a1a)
+───────────────────────────────────────────── */
+.lc-nav{
+  height:44px;
+  min-height:44px;
+  background:var(--lc-nav);
+  border-bottom:1px solid var(--lc-border);
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:0 14px;
+  flex-shrink:0;
+  z-index:200;
+  gap:6px;
+}
+.lc-nav-l,.lc-nav-c,.lc-nav-r{
+  display:flex;
+  align-items:center;
+}
+.lc-nav-l{flex:1;gap:6px}
+.lc-nav-c{flex-shrink:0;gap:6px}
+.lc-nav-r{flex:1;justify-content:flex-end;gap:6px}
+
+/* Logo */
+.lc-logo{
+  display:flex;align-items:center;gap:6px;
+  font-weight:700;font-size:14px;color:var(--lc-t1);
+  white-space:nowrap;
+}
+.lc-logo-icon{
+  width:24px;height:24px;
+  background:#ffa116;
+  border-radius:4px;
+  display:flex;align-items:center;justify-content:center;
+  font-weight:900;font-size:11px;color:#1a1a1a;
+  flex-shrink:0;
+}
+
+/* nav separator */
+.nav-sep{width:1px;height:20px;background:var(--lc-border);flex-shrink:0;margin:0 4px}
+
+/* small ghost icon button */
+.nav-icon-btn{
+  display:flex;align-items:center;justify-content:center;
+  width:30px;height:30px;
+  background:none;border:none;
+  color:var(--lc-t3);border-radius:var(--lc-r2);
+  font-size:13px;transition:background .12s,color .12s;
+}
+.nav-icon-btn:hover{background:var(--lc-hover);color:var(--lc-t1)}
+
+/* nav label */
+.nav-label{
+  font-size:13px;font-weight:500;color:var(--lc-t2);
+  display:flex;align-items:center;gap:5px;white-space:nowrap;
+}
+
+/* Run button */
+.btn-run{
+  display:flex;align-items:center;gap:5px;
+  height:28px;padding:0 12px;
+  background:#373737;border:1px solid #555;border-radius:var(--lc-r2);
+  color:var(--lc-t1);font-size:13px;font-weight:500;
+  transition:background .12s;white-space:nowrap;
+}
+.btn-run:hover:not(:disabled){background:#454545}
+.btn-run:disabled{opacity:.45;cursor:not-allowed}
+.btn-run .run-play{color:#4ade80;font-size:10px}
+
+/* Submit button */
+.btn-submit{
+  display:flex;align-items:center;gap:5px;
+  height:28px;padding:0 12px;
+  background:var(--lc-green);border:none;border-radius:var(--lc-r2);
+  color:#fff;font-size:13px;font-weight:600;
+  transition:background .12s,opacity .12s;white-space:nowrap;
+}
+.btn-submit:hover:not(:disabled){background:var(--lc-green2);background:#25a352}
+.btn-submit:disabled{opacity:.45;cursor:not-allowed}
+
+/* Login CTA */
+.btn-login{
+  display:flex;align-items:center;gap:5px;
+  height:28px;padding:0 12px;
+  background:none;border:1px solid var(--lc-green);border-radius:var(--lc-r2);
+  color:var(--lc-green);font-size:13px;font-weight:500;
+  transition:background .12s;white-space:nowrap;
+}
+.btn-login:hover{background:rgba(44,187,93,.1)}
+
+/* Timer */
+.lc-timer{
+  display:flex;align-items:center;gap:4px;
+  font-size:12px;color:var(--lc-t3);font-variant-numeric:tabular-nums;
+  white-space:nowrap;
+}
+
+/* spinner hidden by default */
+.spin-hidden{display:none!important}
+.btn-loading{opacity:.65!important;pointer-events:none!important}
+
+/* ─────────────────────────────────────────────
+   LAYOUT SHELL
+───────────────────────────────────────────── */
+.lc-shell{
+  display:flex;
+  height:calc(100vh - 44px);
+  width:100%;
+  background:var(--lc-page);
+  overflow:hidden;
+}
+
+/* ─────────────────────────────────────────────
+   SIDEBAR  (problem list, ~260px default)
+───────────────────────────────────────────── */
+#sidebar-pane{
+  background:var(--lc-panel);
+  border-right:1px solid var(--lc-border);
+  display:flex;flex-direction:column;
+  overflow:hidden;min-width:0;
+}
+.sb-head{
+  padding:10px 12px 8px;
+  border-bottom:1px solid var(--lc-border);
+  flex-shrink:0;
+}
+.sb-head-label{
+  font-size:11px;font-weight:600;letter-spacing:.06em;
+  text-transform:uppercase;color:var(--lc-t3);margin-bottom:7px;
+}
+
+/* sheet selector */
+.sb-select-wrap{position:relative}
+.sb-select-wrap::after{
+  content:'\f078';font-family:'Font Awesome 6 Free';font-weight:900;
+  position:absolute;right:9px;top:50%;transform:translateY(-50%);
+  font-size:9px;color:var(--lc-t3);pointer-events:none;
+}
+#sheet-select{
+  width:100%;background:var(--lc-input);color:var(--lc-t1);
+  border:1px solid var(--lc-border);border-radius:var(--lc-r2);
+  padding:5px 26px 5px 9px;font-size:13px;
+  outline:none;cursor:pointer;appearance:none;-webkit-appearance:none;
+  transition:border-color .12s;
+}
+#sheet-select:hover{border-color:var(--lc-border2)}
+#sheet-select:focus{border-color:var(--lc-green)}
+#sheet-select option{background:var(--lc-panel)}
+
+/* scrollable patterns list */
+#patterns-container{flex:1;overflow-y:auto;padding:2px 0}
+
+/* pattern / category header */
+.pat-hdr{
+  cursor:pointer;
+  padding:8px 12px;
+  font-size:13px;font-weight:600;
+  color:var(--lc-t2);
+  display:flex;justify-content:space-between;align-items:center;
+  border-bottom:1px solid var(--lc-border);
+  user-select:none;
+  transition:background .12s,color .12s;
+}
+.pat-hdr:hover{background:var(--lc-hover);color:var(--lc-t1)}
+.pat-hdr-l{display:flex;align-items:center;gap:7px}
+.pat-chevron{font-size:10px;color:var(--lc-t3);transition:transform .2s}
+.pat-count{font-size:11px;color:var(--lc-t3);background:#333;
+  padding:1px 7px;border-radius:10px;font-weight:500}
+
+/* question list */
+.q-list{list-style:none;display:none;background:var(--lc-sidebar)}
+.q-list.open{display:block}
+
+/* question item — LeetCode style: number + name + status */
+.q-item{
+  padding:8px 12px 8px 22px;
+  cursor:pointer;
+  font-size:13px;color:var(--lc-t2);
+  display:flex;align-items:center;gap:8px;
+  border-bottom:1px solid #2a2a2a;
+  border-left:3px solid transparent;
+  transition:background .12s,color .12s;
+}
+.q-item:hover{background:#2c2c2c;color:var(--lc-t1)}
+.q-item.selected{
+  background:rgba(44,187,93,.08);
+  color:var(--lc-green);
+  border-left-color:var(--lc-green);
+}
+.q-num{font-size:12px;color:var(--lc-t3);min-width:26px;flex-shrink:0;font-variant-numeric:tabular-nums}
+.q-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.q-check{font-size:11px;color:var(--lc-green);flex-shrink:0}
+
+/* ─────────────────────────────────────────────
+   WORKSPACE  (fills remaining width)
+───────────────────────────────────────────── */
+#workspace-pane{
+  display:flex;flex-direction:column;
+  flex:1;min-width:0;overflow:hidden;
+}
+
+/* empty state */
+.ws-empty{
+  flex:1;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:10px;
+  color:var(--lc-t3);font-size:14px;text-align:center;
+  padding:20px;
+}
+.ws-empty i{font-size:32px;opacity:.15}
+.ws-empty h3{font-size:16px;font-weight:600;color:var(--lc-t2);margin:4px 0 0}
+.ws-empty p{font-size:13px;max-width:220px;color:var(--lc-t3)}
+
+/* active workspace — horizontal split container */
+#active-workspace{
+  flex:1;display:none;
+  padding:6px;gap:0;overflow:hidden;
+  background:var(--lc-page);
+}
+
+/* ─────────────────────────────────────────────
+   PANE  (rounded card with border — LeetCode)
+───────────────────────────────────────────── */
+.pane{
+  background:var(--lc-panel);
+  border-radius:var(--lc-r);
+  border:1px solid var(--lc-border);
+  display:flex;flex-direction:column;
+  overflow:hidden;min-width:0;min-height:0;
+}
+
+/* ─────────────────────────────────────────────
+   TABS  (exact LeetCode: no pill, underline only)
+───────────────────────────────────────────── */
+.tab-bar{
+  display:flex;align-items:stretch;
+  background:var(--lc-panel);
+  border-bottom:1px solid var(--lc-border);
+  padding:0 14px;flex-shrink:0;
+  overflow-x:auto;gap:0;
+}
+.tab-bar::-webkit-scrollbar{display:none}
+
+.tab{
+  padding:0 14px;height:40px;
+  display:flex;align-items:center;gap:6px;
+  font-size:13px;font-weight:500;
+  color:var(--lc-t3);
+  cursor:pointer;white-space:nowrap;
+  border-bottom:2px solid transparent;
+  margin-bottom:-1px;
+  transition:color .12s;
+  user-select:none;
+}
+.tab:hover{color:var(--lc-t1)}
+.tab.active{color:var(--lc-t1);border-bottom-color:var(--lc-t1)}
+.tab svg,.tab i{font-size:12px}
+
+/* tab panels */
+.tab-panel{display:none;flex:1;flex-direction:column;overflow:hidden;min-height:0}
+.tab-panel.active{display:flex}
+
+/* ─────────────────────────────────────────────
+   DESCRIPTION PANEL
+───────────────────────────────────────────── */
+/* desc-body — see full definition near bottom of style block */
+
+/* problem number + title */
+.prob-title{
+  font-size:20px;font-weight:700;
+  color:var(--lc-t1);line-height:1.35;
+  margin-bottom:12px;
+  display:flex;align-items:flex-start;gap:10px;
+}
+.prob-title-text{flex:1}
+.prob-solved{font-size:13px;color:var(--lc-green);font-weight:600;white-space:nowrap;margin-top:5px}
+
+/* badge row — exactly like LeetCode */
+.badge-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px;align-items:center}
+
+/* difficulty badges */
+.badge{
+  display:inline-flex;align-items:center;gap:4px;
+  padding:4px 11px;border-radius:999px;
+  font-size:12px;font-weight:600;border:none;cursor:default;
+}
+.badge-easy  {background:rgba(0,184,163,.1);color:#00b8a3}
+.badge-medium{background:rgba(255,184,0,.1);color:#ffb800}
+.badge-hard  {background:rgba(255,55,95,.1);color:#ff375f}
+
+/* metadata badges (Topics, Companies, Hint) — exactly LeetCode style */
+.meta-badge{
+  display:inline-flex;align-items:center;gap:5px;
+  padding:4px 10px;border-radius:var(--lc-r2);
+  font-size:12px;font-weight:500;
+  background:var(--lc-hover);color:var(--lc-t2);
+  border:none;cursor:pointer;
+  transition:background .12s,color .12s;
+}
+.meta-badge:hover{background:#4a4a4a;color:var(--lc-t1)}
+.meta-badge i{font-size:11px;color:var(--lc-t3)}
+
+/* completion icon */
+#completion-status{font-size:14px;color:var(--lc-green);flex-shrink:0;margin-top:4px}
+
+/* markdown content */
+.md-body{
+  font-size:14px;line-height:1.7;color:var(--lc-t1);
+}
+.md-body p{margin-bottom:14px}
+.md-body h1,.md-body h2{font-size:15px;font-weight:700;margin:18px 0 10px;color:var(--lc-t1)}
+.md-body h3{font-size:14px;font-weight:600;margin:14px 0 8px}
+.md-body ul,.md-body ol{padding-left:22px;margin-bottom:14px}
+.md-body li{margin-bottom:5px}
+.md-body strong{color:var(--lc-t1);font-weight:700}
+.md-body code{
+  background:#333;
+  padding:2px 6px;border-radius:3px;
+  font-family:var(--mono);font-size:13px;color:#e06c75;
+}
+.md-body pre{
+  background:#1e1e1e;border:1px solid var(--lc-border);
+  padding:14px 16px;border-radius:var(--lc-r2);
+  overflow-x:auto;margin-bottom:16px;
+}
+.md-body pre code{
+  background:none;padding:0;color:var(--lc-t1);font-size:13px;
+}
+.md-body blockquote{
+  border-left:3px solid var(--lc-border2);
+  padding-left:14px;color:var(--lc-t2);margin:0 0 14px;
+}
+
+/* ─── description footer bar (likes, shares etc.) — LeetCode ─── */
+.desc-footer{
+  display:flex;align-items:center;gap:12px;
+  padding:9px 16px;
+  border-top:1px solid var(--lc-border);
+  background:var(--lc-panel);
+  flex-shrink:0;font-size:13px;color:var(--lc-t3);
+}
+.desc-footer-btn{
+  display:flex;align-items:center;gap:5px;
+  background:none;border:none;color:var(--lc-t3);
+  font-size:13px;cursor:pointer;padding:3px 6px;
+  border-radius:var(--lc-r2);transition:color .12s,background .12s;
+}
+.desc-footer-btn:hover{color:var(--lc-t1);background:var(--lc-hover)}
+.desc-footer-sep{width:1px;height:16px;background:var(--lc-border)}
+.online-dot{
+  margin-left:auto;display:flex;align-items:center;gap:5px;
+  font-size:12px;color:var(--lc-t3);
+}
+.online-dot::before{
+  content:'';width:8px;height:8px;border-radius:50%;
+  background:var(--lc-green);display:block;
+}
+
+/* placeholder panels (editorial / solutions / submissions) */
+.placeholder-panel{
+  flex:1;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:12px;padding:30px;text-align:center;
+  color:var(--lc-t3);
+}
+.placeholder-panel i{font-size:28px;opacity:.2}
+.placeholder-panel p{font-size:13px;max-width:260px}
+
+/* ─────────────────────────────────────────────
+   EDITOR PANE
+───────────────────────────────────────────── */
+/* Editor toolbar — exactly LeetCode */
+.editor-toolbar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:5px 12px;
+  border-bottom:1px solid var(--lc-border);
+  background:var(--lc-panel);
+  flex-shrink:0;
+  gap:8px;height:38px;
+}
+.editor-tb-l,.editor-tb-r{display:flex;align-items:center;gap:6px}
+
+/* language dropdown — LeetCode style */
+.lang-wrap{position:relative}
+.lang-wrap::after{
+  content:'\f078';font-family:'Font Awesome 6 Free';font-weight:900;
+  position:absolute;right:7px;top:50%;transform:translateY(-50%);
+  font-size:9px;color:var(--lc-t3);pointer-events:none;
+}
+#editor-mode{
+  background:#373737;color:var(--lc-t1);
+  border:1px solid var(--lc-border);border-radius:var(--lc-r2);
+  padding:4px 24px 4px 9px;font-size:13px;
+  outline:none;cursor:pointer;appearance:none;-webkit-appearance:none;
+  height:26px;transition:border-color .12s;
+}
+#editor-mode:hover{border-color:var(--lc-border2)}
+#editor-mode:focus{border-color:var(--lc-green)}
+#editor-mode option{background:var(--lc-panel)}
+
+/* small toolbar icon buttons */
+.tb-icon-btn{
+  display:flex;align-items:center;justify-content:center;
+  width:26px;height:26px;background:none;border:none;
+  color:var(--lc-t3);border-radius:var(--lc-r2);
+  font-size:13px;transition:background .12s,color .12s;
+}
+.tb-icon-btn:hover{background:var(--lc-hover);color:var(--lc-t1)}
+
+/* font size buttons */
+.fs-btn{
+  display:flex;align-items:center;justify-content:center;
+  height:26px;padding:0 7px;
+  background:#373737;border:1px solid var(--lc-border);border-radius:var(--lc-r2);
+  color:var(--lc-t2);font-size:12px;font-weight:700;
+  transition:background .12s,color .12s;
+}
+.fs-btn:hover{background:var(--lc-hover);color:var(--lc-t1)}
+
+/* saved label */
+.editor-saved{font-size:11px;color:var(--lc-t3)}
+
+/* Monaco / textarea fill remaining */
+#monaco-editor{flex:1;min-height:0;overflow:hidden}
+#plain-editor{
+  flex:1;min-height:0;display:none;
+  width:100%;height:100%;
+  background:#1e1e1e;color:var(--lc-t1);
+  border:none;padding:14px 16px;
+  font-family:var(--mono);font-size:13px;line-height:1.6;
+  resize:none;outline:none;
+}
+
+/* right-side info (Ln Col) */
+.editor-status{
+  display:flex;gap:12px;align-items:center;
+  padding:3px 14px;border-top:1px solid var(--lc-border);
+  background:var(--lc-panel);flex-shrink:0;
+  font-size:11px;color:var(--lc-t3);
+}
+
+/* ─────────────────────────────────────────────
+   CONSOLE / TESTCASE PANE
+───────────────────────────────────────────── */
+/* console header bar */
+.console-hdr{
+  display:flex;align-items:center;justify-content:space-between;
+  border-bottom:1px solid var(--lc-border);
+  background:var(--lc-panel);padding:0 14px;
+  flex-shrink:0;height:40px;
+}
+.console-tabs{display:flex;align-items:stretch;gap:0;height:100%}
+.console-tab{
+  display:flex;align-items:center;gap:6px;
+  padding:0 12px;height:100%;
+  font-size:13px;font-weight:500;color:var(--lc-t3);
+  cursor:pointer;border-bottom:2px solid transparent;
+  margin-bottom:-1px;transition:color .12s;user-select:none;
+}
+.console-tab:hover{color:var(--lc-t1)}
+.console-tab.active{color:var(--lc-t1);border-bottom-color:var(--lc-t1)}
+.console-tab i{font-size:11px}
+
+/* console body */
+.console-body{
+  flex:1;overflow-y:auto;padding:14px 16px;position:relative;
+  min-height:0;
+}
+
+/* test case pill buttons — LeetCode rounded rect */
+.tc-pills{display:flex;gap:8px;margin-bottom:14px}
+.tc-pill{
+  padding:5px 16px;border-radius:var(--lc-r2);
+  background:#333;color:var(--lc-t2);
+  cursor:pointer;font-size:13px;border:1px solid var(--lc-border);
+  transition:background .12s,color .12s;
+  user-select:none;
+}
+.tc-pill:hover{background:var(--lc-hover);color:var(--lc-t1)}
+.tc-pill.active{background:#404040;color:var(--lc-t1);border-color:var(--lc-border2)}
+
+/* tc input group */
+.tc-group{margin-bottom:14px}
+.tc-label{
+  display:block;font-size:12px;font-family:var(--mono);
+  color:var(--lc-t3);margin-bottom:5px;
+}
+.tc-input{
+  width:100%;background:#333;border:1px solid var(--lc-border);
+  color:var(--lc-t1);padding:8px 11px;border-radius:var(--lc-r2);
+  font-family:var(--mono);font-size:13px;outline:none;
+  transition:border-color .12s;
+}
+.tc-input:hover{border-color:var(--lc-border2)}
+.tc-input:focus{border-color:#888;background:#3a3a3a}
+
+/* console footer (add/remove + run shortcut) */
+.console-footer{
+  display:flex;align-items:center;gap:8px;justify-content:space-between;
+  padding:7px 14px;border-top:1px solid var(--lc-border);
+  background:var(--lc-panel);flex-shrink:0;
+}
+.console-footer-l{display:flex;align-items:center;gap:6px}
+.console-footer-r{display:flex;align-items:center;gap:6px}
+
+/* small action buttons */
+.sm-btn{
+  display:flex;align-items:center;gap:4px;
+  height:24px;padding:0 10px;
+  background:#373737;border:1px solid var(--lc-border);border-radius:var(--lc-r2);
+  color:var(--lc-t2);font-size:12px;
+  transition:background .12s,color .12s;
+}
+.sm-btn:hover{background:var(--lc-hover);color:var(--lc-t1)}
+
+/* run in footer */
+.sm-btn-run{
+  display:flex;align-items:center;gap:4px;
+  height:24px;padding:0 10px;
+  background:none;border:1px solid rgba(74,222,128,.35);border-radius:var(--lc-r2);
+  color:#4ade80;font-size:12px;
+  transition:background .12s;
+}
+.sm-btn-run:hover:not(:disabled){background:rgba(74,222,128,.08)}
+.sm-btn-run:disabled{opacity:.45;cursor:not-allowed}
+
+/* ─── Result display ─── */
+.result-wrap{padding:0}
+
+/* big status headline */
+.res-headline{
+  font-size:20px;font-weight:700;margin-bottom:10px;
+  display:flex;align-items:baseline;gap:8px;
+}
+.res-headline.ok{color:var(--lc-green)}
+.res-headline.fail{color:#ef4743}
+.res-headline small{
+  font-size:13px;font-weight:400;
+  color:var(--lc-t3);margin-left:4px;
+}
+
+.res-section{margin-bottom:14px}
+.res-section-label{
+  font-size:12px;
+  color:var(--lc-t3);font-weight:600;margin-bottom:5px;
+}
+.res-box{
+  background:#333;border:1px solid var(--lc-border);
+  border-radius:var(--lc-r2);padding:10px 12px;
+  font-family:var(--mono);font-size:13px;
+  color:var(--lc-t1);white-space:pre-wrap;word-break:break-all;
+}
+.res-box.fail-val{color:#ef4743}
+.res-box.ok-val{color:var(--lc-green)}
+
+/* LeetCode-style Tabs */
+.tc-tabs{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;}
+.tc-tab{
+  padding:4px 12px;border-radius:4px;font-size:13px;font-weight:600;
+  color:var(--lc-t2);background:#333;border:none;cursor:pointer;
+  display:flex;align-items:center;gap:6px;
+  transition:all 0.15s;
+}
+.tc-tab:hover{background:#444}
+.tc-tab.active{background:#444;color:var(--lc-t1);border:1px solid var(--lc-border);}
+.tc-tab i.fa-times{color:#ef4743;}
+.tc-tab i.fa-check{color:var(--lc-green);}
+
+/* empty result state */
+.result-empty{
+  display:flex !important; flex-direction:column;align-items:center;
+  justify-content:center;height:100%;gap:8px;
+  color:var(--lc-t3);font-size:13px;text-align:center;
+}
+
+/* loading overlay */
+#loading-overlay{
+  position:absolute;inset:0;
+  background:rgba(28,28,28,.85);
+  display:none;flex-direction:column;align-items:center;
+  justify-content:center;gap:10px;z-index:30;
+  color:var(--lc-t2);font-size:13px;backdrop-filter:blur(2px);
+}
+
+/* ═══════════════════════════════════════════════
+   CUSTOM DRAG DIVIDERS
+   — replaces Split.js for full visual control —
+═══════════════════════════════════════════════ */
+
+/* ── shared divider base ── */
+.drag-divider {
+  flex-shrink: 0;
+  position: relative;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* smooth accent transition */
+  transition: background 0.12s;
+  user-select: none;
+  -webkit-user-select: none;
+}
+/* prevent text-selection anywhere while dragging */
+body.is-dragging * { user-select: none !important; -webkit-user-select: none !important; }
+body.is-dragging { cursor: inherit !important; }
+
+/* ── VERTICAL divider (between left/right panes) ── */
+.drag-divider.vertical {
+  width: 5px;
+  height: 100%;
+  cursor: col-resize;
+  background: var(--lc-page);
+  /* thin visible line on each side */
+  border-left:  1px solid var(--lc-border);
+  border-right: 1px solid var(--lc-border);
+}
+.drag-divider.vertical::after {
+  /* 3-dot handle — vertical */
+  content: '';
+  display: block;
+  width: 3px;
+  height: 32px;
+  background-image: radial-gradient(circle, #666 1.2px, transparent 1.2px);
+  background-size: 3px 10px;
+  background-repeat: repeat-y;
+  border-radius: 2px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.drag-divider.vertical:hover,
+.drag-divider.vertical.dragging {
+  background: #2cbb5d22;     /* faint green fill */
+  border-left-color:  var(--lc-green);
+  border-right-color: var(--lc-green);
+}
+.drag-divider.vertical:hover::after,
+.drag-divider.vertical.dragging::after {
+  opacity: 1;
+  background-image: radial-gradient(circle, var(--lc-green) 1.2px, transparent 1.2px);
+}
+
+/* ── HORIZONTAL divider (between editor/console) ── */
+.drag-divider.horizontal {
+  width: 100%;
+  height: 5px;
+  cursor: row-resize;
+  background: var(--lc-page);
+  border-top:    1px solid var(--lc-border);
+  border-bottom: 1px solid var(--lc-border);
+  flex-direction: row;
+}
+.drag-divider.horizontal::after {
+  /* 3-dot handle — horizontal */
+  content: '';
+  display: block;
+  height: 3px;
+  width: 32px;
+  background-image: radial-gradient(circle, #666 1.2px, transparent 1.2px);
+  background-size: 10px 3px;
+  background-repeat: repeat-x;
+  border-radius: 2px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.drag-divider.horizontal:hover,
+.drag-divider.horizontal.dragging {
+  background: #2cbb5d22;
+  border-top-color:    var(--lc-green);
+  border-bottom-color: var(--lc-green);
+}
+.drag-divider.horizontal:hover::after,
+.drag-divider.horizontal.dragging::after {
+  opacity: 1;
+  background-image: radial-gradient(circle, var(--lc-green) 1.2px, transparent 1.2px);
+}
+
+/* ── SIDEBAR divider (thicker, always visible) ── */
+#sidebar-pane, #div-sidebar, #sidebar-toggle-btn {
+  display: none !important;
+}
+
+.drag-divider.sidebar {
+  width: 4px;
+  height: 100%;
+  cursor: col-resize;
+  background: var(--lc-border);
+  border: none;
+  flex-shrink: 0;
+  transition: background 0.12s, width 0.05s;
+}
+.drag-divider.sidebar:hover,
+.drag-divider.sidebar.dragging {
+  background: var(--lc-green);
+  width: 4px;
+}
+
+/* ── Pane layout — flexbox-based, no fixed percentages ── */
+.lc-shell {
+  flex-direction: row !important;   /* override any column set */
+}
+#sidebar-pane   { flex-shrink: 0; overflow: hidden; }
+#workspace-pane { flex: 1; min-width: 0; overflow: hidden; display: flex; flex-direction: column; }
+
+#active-workspace {
+  display: none;       /* shown by JS when question loads */
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  padding: 6px;
+  gap: 0;
+  background: var(--lc-page);
+}
+/* Left pane must scroll, never clip content */
+#left-pane  { flex-shrink: 0; overflow: hidden; display: flex; flex-direction: column; }
+#right-pane { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
+#editor-pane  { flex-shrink: 0; overflow: hidden; display: flex; flex-direction: column; }
+#console-pane { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
+
+/* desc-body: scrollable, text wraps — never clips horizontally */
+.desc-body {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 20px 24px 24px;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+.md-body { word-wrap: break-word; overflow-wrap: break-word; }
+.md-body p, .md-body li { word-wrap: break-word; overflow-wrap: break-word; }
+
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- ══════════════════════════════════════════
+     TOP NAVBAR  (exact LeetCode)
+══════════════════════════════════════════ -->
+<nav class="lc-nav" role="navigation" aria-label="Top navigation">
+
+  <!-- LEFT: logo · separator · hamburger · "Problem List" -->
+  <div class="lc-nav-l">
+    <a href="/" class="lc-logo" aria-label="450 DSA Home">
+      <div class="lc-logo-icon">D</div>
+      <span>450 DSA</span>
+    </a>
+    <div class="nav-sep"></div>
+    <button class="nav-icon-btn" id="sidebar-toggle-btn"
+            onclick="window.toggleSidebar()" title="Toggle problem list" aria-label="Toggle sidebar">
+      <i class="fas fa-list"></i>
+    </button>
+    <span class="nav-label">
+      <i class="fas fa-chevron-left" style="font-size:10px;opacity:.5"></i>
+      <i class="fas fa-chevron-right" style="font-size:10px;opacity:.5"></i>
+      Problem List
+    </span>
+  </div>
+
+  <!-- CENTER: Run · Submit -->
+  <div class="lc-nav-c">
+    <button class="btn-run" id="run-btn"
+            {% if not current_user.is_authenticated %}disabled{% endif %}
+            title="Run code (Ctrl+Enter)" aria-label="Run">
+      <i class="fas fa-spinner fa-spin spin-hidden" id="run-spin"></i>
+      <i class="fas fa-play run-play"></i>
+      Run
+    </button>
+    <button class="btn-submit" id="submit-btn"
+            {% if not current_user.is_authenticated %}disabled{% endif %}
+            title="Submit solution" aria-label="Submit">
+      <i class="fas fa-spinner fa-spin spin-hidden" id="sub-spin"></i>
+      Submit
+    </button>
+  </div>
+
+  <!-- RIGHT: timer · settings · login -->
+  <div class="lc-nav-r">
+    <div class="lc-timer" id="stopwatch">
+      <i class="fas fa-stopwatch" style="font-size:11px;opacity:.6"></i>
+      <span id="timer-display">00:00</span>
+    </div>
+    <button class="nav-icon-btn" id="fullscreen-btn" title="Toggle fullscreen" aria-label="Fullscreen">
+      <i class="fas fa-expand-alt" style="font-size:12px"></i>
+    </button>
+    <button class="nav-icon-btn" title="Settings" aria-label="Settings">
+      <i class="fas fa-cog" style="font-size:12px"></i>
+    </button>
+    {% if not current_user.is_authenticated %}
+      <a href="{{ url_for('auth.login') }}" class="btn-login">
+        <i class="fas fa-sign-in-alt" style="font-size:11px"></i>
+        Login to Submit
+      </a>
+    {% endif %}
+  </div>
+</nav>
+
+<!-- ══════════════════════════════════════════
+     MAIN SHELL  (sidebar + workspace)
+══════════════════════════════════════════ -->
+<div class="lc-shell" id="main-shell">
+
+  <!-- ── SIDEBAR COLLAPSE TOGGLE ── -->
+  <button id="sidebar-toggle-btn" class="sm-btn" style="position: absolute; left: 10px; top: 70px; z-index: 100; display: none; background: #333; border: 1px solid var(--lc-border);" title="Show Problem List"><i class="fas fa-list"></i></button>
+
+  <!-- ── SIDEBAR ── -->
+  <div id="sidebar-pane" role="complementary" aria-label="Problem list">
+    <div class="sb-head" style="display: flex; justify-content: space-between; align-items: center;">
+      <div style="flex: 1;">
+        <div class="sb-head-label">Sheet</div>
+        <div class="sb-select-wrap">
+          <select id="sheet-select" aria-label="Select problem sheet"></select>
+        </div>
+      </div>
+      <button id="sidebar-close-btn" class="sm-btn" style="background: transparent; border: none; color: var(--lc-t3);" title="Hide Problem List"><i class="fas fa-chevron-left"></i></button>
+    </div>
+    <div id="patterns-container">
+      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100px;gap:8px;color:var(--lc-t3);font-size:13px">
+        <i class="fas fa-circle-notch fa-spin"></i> Loading…
+      </div>
+    </div>
+  </div>
+
+  <!-- ── SIDEBAR DRAG DIVIDER ── -->
+  <div class="drag-divider sidebar" id="div-sidebar" role="separator" aria-label="Drag to resize sidebar" title="Drag to resize sidebar"></div>
+
+  <!-- ── WORKSPACE ── -->
+  <div id="workspace-pane">
+
+    <!-- empty state (no question selected) -->
+    <div id="empty-workspace" class="ws-empty">
+      <i class="fas fa-code"></i>
+      <h3>Select a question to begin</h3>
+      <p>Pick a problem from the sidebar to load the description and editor.</p>
+    </div>
+
+    <!-- ACTIVE workspace — split into left (desc) + right (editor+console) -->
+    <div id="active-workspace">
+
+      <!-- ── LEFT PANE: Description ── -->
+      <div id="left-pane" class="pane">
+
+        <!-- tab bar -->
+        <div class="tab-bar" role="tablist">
+          <div class="tab active" role="tab" tabindex="0" data-desc-tab="description">
+            <i class="far fa-file-alt"></i> Description
+          </div>
+          <div class="tab" role="tab" tabindex="0" data-desc-tab="submission" id="desc-tab-submission" style="display:none; color:var(--lc-green);">
+            <i class="fas fa-history"></i> <span id="submission-tab-text">Accepted</span>
+            <i class="fas fa-times" style="margin-left: 8px; font-size: 10px; cursor: pointer; color: var(--lc-t3);" id="close-submission-tab"></i>
+          </div>
+          <div class="tab" role="tab" tabindex="0" data-desc-tab="editorial">
+            <i class="fas fa-book-open"></i> Editorial
+          </div>
+          <div class="tab" role="tab" tabindex="0" data-desc-tab="solutions">
+            <i class="fas fa-flask"></i> Solutions
+          </div>
+          <div class="tab" role="tab" tabindex="0" data-desc-tab="submissions">
+            <i class="fas fa-history"></i> Submissions
+          </div>
+        </div>
+
+        <!-- ── Submission panel ── -->
+        <div class="tab-panel" id="desc-panel-submission" role="tabpanel">
+          <div class="desc-body" id="submission-panel-content">
+            <!-- content will be injected via JS -->
+          </div>
+        </div>
+
+        <!-- ── Description panel ── -->
+        <div class="tab-panel active" id="desc-panel-description" role="tabpanel">
+          <div class="desc-body">
+            <!-- title + solved badge -->
+            <div class="prob-title">
+              <span class="prob-title-text" id="current-question-title"></span>
+              <span class="prob-solved" id="completion-status" style="display:none">
+                Solved <i class="fas fa-check-circle"></i>
+              </span>
+            </div>
+            <!-- badges row -->
+            <div class="badge-row" id="badge-row">
+              <span class="badge badge-medium" id="diff-badge">Medium</span>
+              <span class="meta-badge" id="topics-badge">
+                <i class="fas fa-tag"></i> Topics
+              </span>
+              <span class="meta-badge" id="companies-badge">
+                <i class="fas fa-building"></i> Companies
+              </span>
+              <span class="meta-badge" id="hint-badge" style="display:none">
+                <i class="far fa-lightbulb"></i> Hint
+              </span>
+            </div>
+            <!-- markdown body -->
+            <div id="markdown-content" class="md-body"></div>
+          </div>
+
+          <!-- bottom bar — likes / share / online -->
+          <div class="desc-footer">
+            <button class="desc-footer-btn" title="Like"><i class="far fa-thumbs-up"></i> <span id="like-count">282</span></button>
+            <button class="desc-footer-btn" title="Dislike"><i class="far fa-thumbs-down"></i> <span id="dislike-count">148</span></button>
+            <div class="desc-footer-sep"></div>
+            <button class="desc-footer-btn" title="Star / Bookmark"><i class="far fa-star"></i></button>
+            <button class="desc-footer-btn" title="Share"><i class="fas fa-share-alt"></i></button>
+            <button class="desc-footer-btn" title="More"><i class="fas fa-ellipsis-h"></i></button>
+            <div class="online-dot" id="online-count">34 Online</div>
+          </div>
+        </div>
+
+        <!-- ── Editorial panel ── -->
+        <div class="tab-panel" id="desc-panel-editorial" role="tabpanel">
+          <div class="placeholder-panel">
+            <i class="fas fa-book-open"></i>
+            <p>Editorial is not available for this problem yet.</p>
+          </div>
+        </div>
+
+        <!-- ── Solutions panel ── -->
+        <div class="tab-panel" id="desc-panel-solutions" role="tabpanel">
+          <div class="desc-body">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+              <h3 style="margin:0; font-size:16px; color:var(--lc-t1);">Community Solutions</h3>
+              <button class="sm-btn sm-btn-run" id="post-solution-btn" style="padding:4px 12px; background:var(--lc-green); color:#1a1a1a; font-weight:600; border:none;"><i class="fas fa-plus"></i> Post Solution</button>
+            </div>
+            
+            <div id="post-solution-form" style="display:none; background:#333; padding:16px; border-radius:var(--lc-r2); margin-bottom:16px; border:1px solid var(--lc-border);">
+              <input type="text" id="solution-title" placeholder="Title (e.g. O(N) Time, O(1) Space)" style="width:100%; padding:8px; margin-bottom:12px; background:#222; border:1px solid var(--lc-border); color:var(--lc-t1); border-radius:4px;">
+              <input type="text" id="solution-tags" placeholder="Tags (comma-separated, e.g. Array, Two Pointers)" style="width:100%; padding:8px; margin-bottom:12px; background:#222; border:1px solid var(--lc-border); color:var(--lc-t1); border-radius:4px;">
+              <textarea id="solution-desc" placeholder="Explanation (Optional)" style="width:100%; height:80px; padding:8px; margin-bottom:12px; background:#222; border:1px solid var(--lc-border); color:var(--lc-t1); border-radius:4px; font-family:var(--font-sans);"></textarea>
+              <div style="display:flex; justify-content:flex-end; gap:8px;">
+                <button class="sm-btn" id="cancel-solution-btn" style="padding:4px 12px; background:transparent; border:1px solid var(--lc-border);">Cancel</button>
+                <button class="sm-btn sm-btn-run" id="submit-solution-btn" style="padding:4px 12px; background:var(--lc-green); color:#1a1a1a; border:none;">Submit</button>
+              </div>
+            </div>
+
+            <div id="solutions-list">
+              <div class="result-empty">Loading solutions...</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Submissions panel ── -->
+        <div class="tab-panel" id="desc-panel-submissions" role="tabpanel">
+          <div class="desc-body">
+            <h3 style="margin:0 0 16px 0; font-size:16px; color:var(--lc-t1);">Your Submissions</h3>
+            <div id="submissions-list">
+              <div class="result-empty">Loading submissions...</div>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /left-pane -->
+
+      <!-- ── HORIZONTAL DRAG DIVIDER (desc | editor) ── -->
+      <div class="drag-divider vertical" id="div-horizontal" role="separator" aria-label="Drag to resize panels" title="Drag to resize panels"></div>
+
+      <!-- ── RIGHT PANE: Editor + Console (vertical split) ── -->
+      <div id="right-pane">
+
+        <!-- EDITOR PANE -->
+        <div id="editor-pane" class="pane">
+
+          <!-- toolbar -->
+          <div class="editor-toolbar">
+            <div class="editor-tb-l">
+              <!-- language / mode selector -->
+              <div class="lang-wrap">
+                <select id="editor-mode" aria-label="Editor language">
+                  <option value="ide">Python3</option>
+                  <option value="interview">Plain Text</option>
+                </select>
+              </div>
+              <!-- Auto / Manual badge — LeetCode style -->
+              <span style="display:flex;align-items:center;gap:4px;font-size:12px;color:var(--lc-t3);background:#333;padding:3px 8px;border-radius:3px;border:1px solid var(--lc-border)">
+                <i class="fas fa-save" style="font-size:10px"></i> Auto
+              </span>
+            </div>
+            <div class="editor-tb-r">
+              <span class="editor-saved" id="editor-saved-lbl">Saved</span>
+              <!-- font size -->
+              <button class="fs-btn" id="font-decrease-btn" title="Decrease font size" aria-label="Decrease font">A-</button>
+              <button class="fs-btn" id="font-increase-btn" title="Increase font size" aria-label="Increase font">A+</button>
+              <!-- separator -->
+              <div style="width:1px;height:16px;background:var(--lc-border)"></div>
+              <!-- reset -->
+              <button class="tb-icon-btn" id="reset-btn" title="Reset to default code" aria-label="Reset">
+                <i class="fas fa-undo"></i>
+              </button>
+              <!-- sync from file -->
+              <button class="tb-icon-btn" id="sync-btn" title="Sync from workspace file" aria-label="Sync">
+                <i class="fas fa-sync-alt"></i>
+              </button>
+              <!-- LeetCode icons (right): push, list, braces, undo, settings -->
+              <button class="nav-icon-btn" title="Push / Share" aria-label="Push">
+                <i class="fas fa-arrow-up-right-from-square" style="font-size:12px"></i>
+              </button>
+              <button class="nav-icon-btn" title="Keyboard shortcuts" aria-label="Shortcuts">
+                <i class="fas fa-keyboard" style="font-size:12px"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- editor body -->
+          <div id="monaco-editor"></div>
+          <textarea id="plain-editor" spellcheck="false" aria-label="Plain text editor"></textarea>
+
+          <!-- bottom status bar (Ln 1 Col 1) -->
+          <div class="editor-status">
+            <span id="editor-ln-col">Ln 1, Col 1</span>
+          </div>
+        </div><!-- /editor-pane -->
+
+        <!-- ── VERTICAL DRAG DIVIDER (editor | console) ── -->
+        <div class="drag-divider horizontal" id="div-vertical" role="separator" aria-label="Drag to resize editor vs console" title="Drag to resize editor / console"></div>
+
+        <!-- CONSOLE PANE -->
+        <div id="console-pane" class="pane">
+
+          <!-- console header -->
+          <div class="console-hdr">
+            <div class="console-tabs" role="tablist">
+              <div class="console-tab active" role="tab" tabindex="0" data-tab="testcase">
+                <i class="fas fa-check-square" style="color:var(--lc-green)"></i> Testcase
+              </div>
+              <div class="console-tab" role="tab" tabindex="0" data-tab="result">
+                <i class="fas fa-terminal" style="color:var(--lc-t3)"></i> Test Result
+              </div>
+            </div>
+            <!-- collapse / expand icon (right) -->
+            <div style="display:flex;align-items:center;gap:4px">
+              <button class="tb-icon-btn" id="console-expand-btn"
+                      title="Expand/collapse console" aria-label="Toggle console">
+                <i class="fas fa-expand" style="font-size:11px"></i>
+              </button>
+              <button class="tb-icon-btn" id="console-close-btn"
+                      title="Close console" aria-label="Close console">
+                <i class="fas fa-chevron-down" style="font-size:11px"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- console body -->
+          <div class="console-body">
+            <!-- loading overlay -->
+            <div id="loading-overlay">
+              <i class="fas fa-circle-notch fa-spin fa-2x" style="color:var(--lc-green)"></i>
+              <div>Evaluating…</div>
+            </div>
+
+            <!-- Testcase tab -->
+            <div id="tab-testcase">
+              <div class="tc-pills" id="tc-pills"></div>
+              <div id="tc-editor"></div>
+            </div>
+
+            <!-- Result tab -->
+            <div id="tab-result" style="display:none">
+              <div id="result-display" class="result-empty">
+                You must run your code first
+              </div>
+            </div>
+          </div><!-- /console-body -->
+
+          <!-- console footer -->
+          <div class="console-footer">
+            <div class="console-footer-l">
+              <button class="sm-btn" id="add-tc-btn" aria-label="Add test case">
+                <i class="fas fa-plus" style="font-size:9px"></i> Add case
+              </button>
+              <button class="sm-btn" id="rm-tc-btn" aria-label="Remove test case">
+                <i class="fas fa-minus" style="font-size:9px"></i> Remove
+              </button>
+            </div>
+            <div class="console-footer-r">
+              <button class="btn-run" id="console-run-btn"
+                      {% if not current_user.is_authenticated %}disabled{% endif %}
+                      style="height:26px;font-size:12px">
+                <i class="fas fa-play run-play"></i> Run
+              </button>
+              <button class="btn-submit" id="console-submit-btn"
+                      {% if not current_user.is_authenticated %}disabled{% endif %}
+                      style="height:26px;font-size:12px">
+                Submit
+              </button>
+            </div>
+          </div>
+
+        </div><!-- /console-pane -->
+
+      </div><!-- /right-pane -->
+
+    </div><!-- /active-workspace -->
+  </div><!-- /workspace-pane -->
+</div><!-- /lc-shell -->
+
+<script src="{{ url_for('static', filename='js/practice.js') }}?v=17"></script>
+<script>
+  window.USER_IS_AUTHENTICATED = {{ 'true' if current_user.is_authenticated else 'false' }};
+  window.CSRF_TOKEN = "{{ csrf_token() }}";
+  window.INITIAL_SHEET = {{ sheet_slug|tojson|safe if sheet_slug else 'null' }};
+  window.INITIAL_QID = {{ q_id|tojson|safe if q_id else 'null' }};
+</script>
+{% endblock %}

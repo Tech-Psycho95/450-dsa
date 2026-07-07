@@ -332,7 +332,7 @@ def test_compute_user_platforms_handles_malformed_external_totals():
 def test_return_keys_present():
     result = compute_c_score(make_user())
     expected_keys = {
-        "c_score", "dsa_done", "lc_total", "lc_easy", "lc_medium",
+        "c_score", "dsa_done", "dsa_marks_earned", "lc_total", "lc_easy", "lc_medium",
         "lc_hard", "lc_rating", "gfg_total", "hr_total", "cn_total",
         "cw_total", "active_days", "total_solved",
     }

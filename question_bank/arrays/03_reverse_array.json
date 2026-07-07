@@ -1,0 +1,25 @@
+{
+  "class_name": "Solution",
+  "method_name": "reverseArray",
+  "param_names": ["arr"],
+  "test_cases": [
+    {
+      "input": [
+        [1, 2, 3, 4, 5]
+      ],
+      "expected": [5, 4, 3, 2, 1]
+    },
+    {
+      "input": [
+        [4, 5, 1, 2]
+      ],
+      "expected": [2, 1, 5, 4]
+    },
+    {
+      "input": [
+        [1]
+      ],
+      "expected": [1]
+    }
+  ]
+}

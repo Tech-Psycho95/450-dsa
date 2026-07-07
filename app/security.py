@@ -11,9 +11,10 @@ CSRF_PROTECTED_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 
 DEFAULT_CSP_DIRECTIVES = {
     "default-src": ["'self'"],
-    "style-src": ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://cdn.jsdelivr.net"],
-    "font-src": ["'self'", "https://fonts.gstatic.com", "https://cdn.jsdelivr.net"],
-    "script-src": ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net", "https://unpkg.com"],
+    "style-src": ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com"],
+    "font-src": ["'self'", "https://fonts.gstatic.com", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com"],
+    "script-src": ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://cdn.jsdelivr.net", "https://unpkg.com", "https://cdnjs.cloudflare.com", "blob:"],
+    "worker-src": ["'self'", "blob:"],
     "img-src": ["'self'", "data:", "https:"],
 }
 

@@ -24,6 +24,7 @@ from progress_import import parse_csv_backup, parse_json_backup, process_dry_run
 tracker_bp = Blueprint("tracker", __name__)
 
 DIFFICULTY_FILTERS = {
+    "basic": "Basic",
     "easy": "Easy",
     "medium": "Medium",
     "hard": "Hard",
@@ -48,6 +49,7 @@ TOPIC_PAGE_QUESTION_PROJECTION = {
     "url2": 1,
     "editorial_links": 1,
     "hints": 1,
+    "marks": 1,
 }
 TOPIC_NOTES_EXPORT_PROJECTION = {"problem": 1}
 QUESTION_STATUS_PROJECTION = {"problem": 1, "url": 1}
@@ -126,6 +128,7 @@ def topic(topic_id):
 
     # Calculate counts based on the unfiltered list of questions
     total_count = len(questions)
+    basic_count = sum(1 for q in questions if q.get('difficulty', 'Medium') == 'Basic')
     easy_count = sum(1 for q in questions if q.get('difficulty', 'Medium') == 'Easy')
     medium_count = sum(1 for q in questions if q.get('difficulty', 'Medium') == 'Medium')
     hard_count = sum(1 for q in questions if q.get('difficulty', 'Medium') == 'Hard')
@@ -166,6 +169,7 @@ def topic(topic_id):
         status_filter=status_filter,
         active_filters=", ".join(active_filters),
         total_count=total_count,
+        basic_count=basic_count,
         easy_count=easy_count,
         medium_count=medium_count,
         hard_count=hard_count,
@@ -217,7 +221,7 @@ def reset_topic_progress(topic_id):
         current_user.reload()
 
         solved_items = {question_id: progress for question_id, progress in current_user.progress.items() if progress.get("done")}
-        all_questions = list(db.question.find({}, {"_id": 1, "url": 1}))
+        all_questions = list(db.question.find({}, {"_id": 1, "url": 1, "marks": 1}))
         in_sheet_platform_counts = compute_in_sheet_platform_counts(solved_items, all_questions)
         db.user.update_one({"_id": current_user.id}, {"$set": {"in_sheet_platform_counts": in_sheet_platform_counts}})
         current_user.reload()
@@ -289,13 +293,16 @@ def update_question(question_id):
               type: string
               example: Question not found
     """
+    is_sheet_question = False
     try:
         question_id_obj = ObjectId(question_id)
+        question = db.question.find_one({"_id": question_id_obj}, QUESTION_STATUS_PROJECTION)
+        if not question:
+            return json_error("Question not found", status_code=404)
     except InvalidId:
-        return json_error("Question not found", status_code=404)
-    question = db.question.find_one({"_id": question_id_obj}, QUESTION_STATUS_PROJECTION)
-    if not question:
-        return json_error("Question not found", status_code=404)
+        # Check if it's a sheet question (e.g. "1")
+        is_sheet_question = True
+        question = {"problem": f"Sheet Question {question_id}", "url": ""}
 
     data = request.get_json(silent=True)
     if not isinstance(data, dict):
@@ -347,11 +354,23 @@ def update_question(question_id):
         update_fields[f"progress.{question_id}.skipped"] = data["skipped"]
 
     if "bookmark" in data:
-        if data["bookmark"] and not existing.get("bookmark"):
-            message = f"🔖 Added '{question.get('problem', 'Question')}' to bookmarks!"
-        elif not data["bookmark"] and existing.get("bookmark"):
-            message = f"📌 Removed '{question.get('problem', 'Question')}' from bookmarks"
-        update_fields[f"progress.{question_id}.bookmark"] = data["bookmark"]
+        sheet_slug = data.get("sheet_slug")
+        if sheet_slug and "bookmarked_sheets" in existing:
+            b_sheets = existing.get("bookmarked_sheets", [])
+            if data["bookmark"] and sheet_slug not in b_sheets:
+                b_sheets.append(sheet_slug)
+            elif not data["bookmark"] and sheet_slug in b_sheets:
+                b_sheets.remove(sheet_slug)
+            update_fields[f"progress.{question_id}.bookmarked_sheets"] = b_sheets
+            update_fields[f"progress.{question_id}.bookmark"] = len(b_sheets) > 0
+        else:
+            if data["bookmark"] and not existing.get("bookmark"):
+                message = f"🔖 Added '{question.get('problem', 'Question')}' to bookmarks!"
+            elif not data["bookmark"] and existing.get("bookmark"):
+                message = f"📌 Removed '{question.get('problem', 'Question')}' from bookmarks"
+            update_fields[f"progress.{question_id}.bookmark"] = data["bookmark"]
+            if not data["bookmark"]:
+                update_fields[f"progress.{question_id}.bookmarked_sheets"] = []
 
     if "revision_status" in data:
         update_fields[
@@ -405,17 +424,78 @@ def bookmarks():
     bookmarked_question_ids = [question_id for question_id, progress_item in progress.items() if progress_item.get("bookmark")]
 
     object_ids = []
+    sheet_q_ids = []
+    
     for question_id in bookmarked_question_ids:
         try:
             object_ids.append(ObjectId(question_id))
         except InvalidId:
-            pass
+            # It's likely a sheet question ID (e.g. "1", "2")
+            sheet_q_ids.append(question_id)
+            
     questions = list(db.question.find({"_id": {"$in": object_ids}}, BOOKMARKS_QUESTION_PROJECTION))
 
     topic_ids = list(set(question["topic"] for question in questions))
     topic_docs = {topic["_id"]: topic["name"] for topic in db.topic.find({"_id": {"$in": topic_ids}})}
     for question in questions:
         question["topic_name"] = topic_docs.get(question["topic"], "Unknown")
+
+    # Load sheet questions if there are any
+    if sheet_q_ids:
+        try:
+            import json
+            import os
+            from app.practice.core.question_manager import get_patterns, BANK_DIR
+            patterns = get_patterns()
+            
+            sheets_file = os.path.join(BANK_DIR, 'sheets.json')
+            sheets_data = {}
+            if os.path.exists(sheets_file):
+                with open(sheets_file, 'r') as f:
+                    sheets_data = json.load(f)
+                    
+            def slugify(text):
+                return text.replace(" ", "-")
+
+            for cat, q_dict in patterns.items():
+                for q_id, q_info in q_dict.items():
+                    if q_id in sheet_q_ids:
+                        q_prog = progress.get(q_id, {})
+                        
+                        bookmarked_sheets = q_prog.get("bookmarked_sheets", [])
+                        if not bookmarked_sheets:
+                            s_slug = q_prog.get("sheet_slug")
+                            if s_slug:
+                                bookmarked_sheets = [s_slug]
+                                
+                        if not bookmarked_sheets:
+                            for s_name, s_qs in sheets_data.items():
+                                if str(q_id) in s_qs:
+                                    bookmarked_sheets = [slugify(s_name)]
+                                    break
+                                
+                        for s_slug in bookmarked_sheets:
+                            target_sheet_name = next((name for name in sheets_data if slugify(name) == s_slug), None)
+                            
+                            if target_sheet_name:
+                                q_slug = slugify(q_info["name"])
+                                url = f"/sheet/{s_slug}/{q_slug}"
+                                topic_name = target_sheet_name
+                            else:
+                                url = f"/sheet/practice/{q_id}"
+                                topic_name = f"Sheet: {cat.capitalize()}"
+
+                            questions.append({
+                                "_id": q_id,
+                                "row_id": f"{q_id}_{s_slug}",
+                                "sheet_slug": s_slug,
+                                "problem": q_info["name"],
+                                "topic_name": topic_name,
+                                "url": url,
+                                "difficulty": q_info.get("difficulty", "Medium")
+                            })
+        except Exception as e:
+            print("Error loading sheet bookmarks:", e)
 
     return render_template("bookmarks.html", questions=questions, progress_dict=progress)
 

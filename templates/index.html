@@ -303,26 +303,67 @@
 
 <div class="page-load-target">
 <div class="page-header">
-    <h1>DSA Topics</h1>
-    <p>Track your progress across all 450 DSA questions</p>
+    <h1>Select a Learning Track</h1>
+    <p>Choose a sheet to practice or track your progress</p>
 </div>
 
-<form class="widget-controls" id="widget-controls" aria-label="Dashboard widgets">
-    <span class="widget-controls-label">Widgets</span>
-    <input class="widget-toggle-input" type="checkbox" id="widget-progress" checked>
-    <label class="widget-toggle-label" for="widget-progress">
-        <i class="bi bi-bar-chart" aria-hidden="true"></i>
-        <span>Progress</span>
-    </label>
-    <input class="widget-toggle-input" type="checkbox" id="widget-topics" checked>
-    <label class="widget-toggle-label" for="widget-topics">
-        <i class="bi bi-grid-3x3-gap" aria-hidden="true"></i>
-        <span>Topics</span>
-    </label>
-    <button type="reset" class="widget-reset-btn" id="widget-reset" aria-label="Reset widgets">
-        <i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i>
-    </button>
-</form>
+<div class="sheets-container mb-5" style="display: flex; gap: 20px; flex-wrap: wrap;">
+    <!-- Tracker Track -->
+    <div class="sheet-card active" id="card-450" style="flex: 1; min-width: 250px; padding: 24px; background: var(--bg-card); border: 2px solid var(--accent); border-radius: var(--radius-lg); cursor: pointer; transition: all 0.2s;">
+        <h3 style="margin-bottom: 8px; color: var(--text-primary);"><i class="bi bi-card-checklist text-primary me-2"></i>450 DSA Tracker</h3>
+        <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 0;">Track your progress across 24 topics with platform sync.</p>
+    </div>
+
+    <!-- Practice Track 1 -->
+    <a href="{{ url_for('sheet.sheet_view', sheet_id='striver-sde-sheet') }}" style="text-decoration: none; flex: 1; min-width: 250px;">
+        <div class="sheet-card" style="padding: 24px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-lg); cursor: pointer; transition: all 0.2s; height: 100%;">
+            <h3 style="margin-bottom: 8px; color: var(--text-primary);"><i class="bi bi-laptop text-success me-2"></i>Striver SDE Sheet</h3>
+            <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 0;">Interactive IDE to practice the top 180 SDE questions.</p>
+        </div>
+    </a>
+
+    <!-- Practice Track 2 -->
+    <a href="{{ url_for('sheet.sheet_view', sheet_id='love-babbar-sheet') }}" style="text-decoration: none; flex: 1; min-width: 250px;">
+        <div class="sheet-card" style="padding: 24px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-lg); cursor: pointer; transition: all 0.2s; height: 100%;">
+            <h3 style="margin-bottom: 8px; color: var(--text-primary);"><i class="bi bi-code-slash text-warning me-2"></i>Love Babbar Practice</h3>
+            <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 0;">Hands-on coding environment for Love Babbar's DSA list.</p>
+        </div>
+    </a>
+</div>
+
+<style>
+    .sheet-card:hover {
+        transform: translateY(-4px);
+        border-color: var(--accent) !important;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    .sheet-card.active {
+        background: rgba(59, 130, 246, 0.05);
+    }
+</style>
+
+<div id="tracker-section" style="display: none;">
+    <div class="page-header d-flex justify-content-between align-items-center">
+        <div>
+            <h2>450 DSA Topics</h2>
+        </div>
+        <form class="widget-controls m-0" id="widget-controls" aria-label="Dashboard widgets">
+            <span class="widget-controls-label">Widgets</span>
+            <input class="widget-toggle-input" type="checkbox" id="widget-progress" checked>
+            <label class="widget-toggle-label" for="widget-progress">
+                <i class="bi bi-bar-chart" aria-hidden="true"></i>
+                <span>Progress</span>
+            </label>
+            <input class="widget-toggle-input" type="checkbox" id="widget-topics" checked>
+            <label class="widget-toggle-label" for="widget-topics">
+                <i class="bi bi-grid-3x3-gap" aria-hidden="true"></i>
+                <span>Topics</span>
+            </label>
+            <button type="reset" class="widget-reset-btn" id="widget-reset" aria-label="Reset widgets">
+                <i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i>
+            </button>
+        </form>
+    </div>
 
 {% set percentage = 0 %}
 {% if total_questions > 0 %}
@@ -395,10 +436,19 @@
     {% endfor %}
 </div>
 </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
 <script>
+function toggleTracker() {
+    const section = document.getElementById('tracker-section');
+    if(section.style.display === 'none' || !section.style.display) {
+        section.style.display = 'block';
+    } else {
+        section.style.display = 'none';
+    }
+}
 const K='pinnedTopics:{{ current_user.get_id() if current_user.is_authenticated else "anonymous" }}',C=[...document.querySelectorAll('.topic-card-shell')],G=()=>{try{return JSON.parse(localStorage[K]||'[]').filter(x=>C.some(c=>c.dataset.topicId==x))}catch{return[]}},S=a=>{try{localStorage[K]=JSON.stringify(a)}catch{}},R=()=>{let p=G();S(p);C.forEach((c,i)=>{let x=c.dataset.topicId,o=p.includes(x);c.classList.toggle('is-pinned',o);c.style.order=o?p.indexOf(x):C.length+i;c.querySelector('.pin-btn').setAttribute('aria-pressed',o)})};document.querySelectorAll('.pin-btn').forEach(b=>b.onclick=e=>{e.preventDefault();e.stopPropagation();let p=G(),x=b.dataset.topicId,i=p.indexOf(x);i<0?p.unshift(x):p.splice(i,1);S(p);R()});R();
 </script>
 {% endblock %}

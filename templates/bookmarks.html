@@ -118,7 +118,9 @@
       {% for q in questions %}
       {% set q_id_str = q._id | string %}
       {% set p = progress_dict.get(q_id_str) %}
-      <tr id="brow-{{ q_id_str }}">
+      {% set row_id = q.row_id if q.row_id else q_id_str %}
+      {% set sheet_slug = q.sheet_slug if q.sheet_slug else "" %}
+      <tr id="brow-{{ row_id }}">
         <td class="q-num">{{ loop.index }}</td>
         <td><input type="checkbox" class="q-checkbox status-checkbox" data-id="{{ q_id_str }}"
             aria-label="Mark '{{ q.problem }}' as done"
@@ -127,16 +129,21 @@
         <td>
           <div class="q-name">{{ q.problem }}</div>
           <div class="q-links">
-            {% if q.url %}<a href="{{ q.url }}" target="_blank" rel="noopener noreferrer"
-              class="q-badge {% if 'leetcode' in q.url %}badge-lc{% elif 'geeksforgeeks' in q.url %}badge-gfg{% else %}badge-link{% endif %}"><i
-                class="bi bi-box-arrow-up-right" style="font-size:.7rem"></i> {{ q.url|platform_name }}</a>{% endif %}
-            {% if q.url2 %}<a href="{{ q.url2 }}" target="_blank" rel="noopener noreferrer"
-              class="q-badge badge-link"><i class="bi bi-box-arrow-up-right" style="font-size:.7rem"></i> {{
-              q.url2|platform_name }}</a>{% endif %}
+            {% if q.url %}
+              <a href="{{ q.url }}" {% if not '/sheet/' in q.url %}target="_blank" rel="noopener noreferrer"{% endif %}
+                class="q-badge {% if 'leetcode' in q.url %}badge-lc{% elif 'geeksforgeeks' in q.url %}badge-gfg{% else %}badge-link{% endif %}">
+                <i class="bi bi-box-arrow-up-right" style="font-size:.7rem"></i> {{ q.url|platform_name }}
+              </a>
+            {% endif %}
+            {% if q.url2 %}
+              <a href="{{ q.url2 }}" target="_blank" rel="noopener noreferrer" class="q-badge badge-link">
+                <i class="bi bi-box-arrow-up-right" style="font-size:.7rem"></i> {{ q.url2|platform_name }}
+              </a>
+            {% endif %}
           </div>
         </td>
         <td>
-          <button class="action-icon bookmark-btn" data-id="{{ q_id_str }}" data-bookmarked="true"
+          <button class="action-icon bookmark-btn" data-id="{{ q_id_str }}" data-rowid="{{ row_id }}" data-sheet="{{ sheet_slug }}" data-bookmarked="true"
             aria-label="Remove bookmark for {{ q.problem }}" aria-pressed="true">
             <i class="bi bi-bookmark-fill" aria-hidden="true"></i>
           </button>
@@ -150,14 +157,16 @@
         </td>
 
         <td>
-          <div>
-              {{ p.get('revision_status', 'To Review') if p else 'To Review' }}
+          <select class="revision-select" data-id="{{ q_id_str }}" style="background: var(--bg-card); color: var(--lc-t1); border: 1px solid var(--border-color); border-radius: 4px; padding: 4px 8px; font-size: 0.85rem;">
+              <option value="To Review" {% if not p or p.get('revision_status', 'To Review') == 'To Review' %}selected{% endif %}>To Review</option>
+              <option value="Reviewed" {% if p and p.get('revision_status') == 'Reviewed' %}selected{% endif %}>Reviewed</option>
+              <option value="Needs Practice" {% if p and p.get('revision_status') == 'Needs Practice' %}selected{% endif %}>Needs Practice</option>
+          </select>
+          {% if p and p.get('last_reviewed') %}
+          <div style="font-size:11px;color:#888;margin-top:4px;">
+              {{ p.get('last_reviewed').strftime('%d %b %Y %H:%M') }}
           </div>
-          <small>
-              {% if p and p.get('last_reviewed') %}
-                {{ p.get('last_reviewed').strftime('%d %b %Y %H:%M') }}
-              {% endif %}
-          </small>
+          {% endif %}
         </td>
       </tr>
       {% endfor %}
@@ -168,7 +177,6 @@
 <div class="empty-state">
   <i class="bi bi-bookmark"></i>
   <p>You haven't bookmarked any questions yet.<br>Go to a topic and click the bookmark icon to save questions here.</p>
-  <a href="{{ url_for('tracker.index') }}"><i class="bi bi-arrow-right-circle"></i> Browse Topics</a>
 </div>
 {% endif %}
 
@@ -218,12 +226,33 @@
   });
   document.querySelectorAll('.bookmark-btn').forEach(btn => {
     btn.addEventListener('click', function () {
-      updateQuestion(this.dataset.id, { bookmark: false }, () => {
-        const row = document.getElementById('brow-' + this.dataset.id);
+      updateQuestion(this.dataset.id, { bookmark: false, sheet_slug: this.dataset.sheet }, () => {
+        const row = document.getElementById('brow-' + this.dataset.rowid);
         if (row) { row.style.transition = 'opacity .3s'; row.style.opacity = '0'; setTimeout(() => row.remove(), 300); }
       });
     });
   });
+  document.querySelectorAll('.revision-select').forEach(select => {
+    select.addEventListener('change', function() {
+        const timestampDiv = this.nextElementSibling;
+        
+        updateQuestion(this.dataset.id, { revision_status: this.value }, () => {
+             // In a real scenario we'd update the timestamp from the server response,
+             // but visually letting it succeed is fine for now.
+             if (this.value === 'Reviewed') {
+                 if (timestampDiv) {
+                     timestampDiv.textContent = 'Just now';
+                 } else {
+                     const small = document.createElement('div');
+                     small.style = "font-size:11px;color:#888;margin-top:4px;";
+                     small.textContent = 'Just now';
+                     this.parentNode.appendChild(small);
+                 }
+             }
+        });
+    });
+  });
+
   document.querySelectorAll('.notes-btn').forEach(btn => {
     btn.addEventListener('click', function () {
       document.getElementById('currentQuestionId').value = this.dataset.id;

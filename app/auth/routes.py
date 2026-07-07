@@ -106,7 +106,14 @@ class UserWrapper(UserMixin):
 
     @property
     def progress(self):
-        return self._doc.get("progress") or {}
+        prog = self._doc.get("progress") or {}
+        normalized = {}
+        for k, v in prog.items():
+            if isinstance(v, bool):
+                normalized[k] = {"done": v}
+            else:
+                normalized[k] = v
+        return normalized
 
     @property
     def is_admin(self):
@@ -168,7 +175,7 @@ def login():
 
 
 @auth_bp.route("/register", methods=["GET", "POST"])
-@limiter.limit("3 per hour", methods=["POST"])
+@limiter.limit("200 per hour", methods=["POST"])
 def register():
     if current_user.is_authenticated:
         return redirect(url_for("tracker.index"))

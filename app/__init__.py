@@ -25,6 +25,7 @@ from app.security import (
 from app.search import search_bp
 from app.tracker import tracker_bp
 from app.cohort.routes import cohort_bp
+from app.practice.routes import practice_bp
 from app.utils import (
     platform_color_filter,
     platform_name_filter,
@@ -152,53 +153,162 @@ def create_app(config_class=None):
     )
 
     try:
-        db.user.create_index("email", unique=True, sparse=True)
+        # ---- user ----
+        db.user.create_index("email",     unique=True, sparse=True)
         db.user.create_index("github_id", unique=True, sparse=True)
         db.user.create_index("google_id", unique=True, sparse=True)
         db.user.create_index("is_admin")
-        db.topic.create_index("name", unique=True)
+
+        # ---- topic ----
+        db.topic.create_index("name",     unique=True)
         db.topic.create_index("position")
-        db.question.create_index("topic")
-        
+
+        # ---- question (new + legacy) ----
+        # sparse=True: documents without questionId (null) are excluded from
+        # the unique constraint, so legacy docs that haven't been assigned an
+        # ID yet don't collide with each other.
         try:
-            db.question.create_index([("topic", 1), ("problem", 1), ("url", 1)], unique=True)
+            db.question.create_index("questionId", unique=True, sparse=True)
+        except Exception:
+            # Old non-sparse index exists — drop and recreate as sparse (one-time migration)
+            try:
+                db.question.drop_index("questionId_1")
+            except Exception:
+                pass
+            db.question.create_index("questionId", unique=True, sparse=True)
+        db.question.create_index("titleSlug",   unique=True)
+        db.question.create_index("topic")
+        db.question.create_index("difficulty")
+        db.question.create_index("topics")        # multikey
+        db.question.create_index("companies")     # multikey
+        db.question.create_index("status")
+        db.question.create_index([("title", "text")], name="title_text")
+        # Legacy compound for tracker routes — keep existing data compatible
+        try:
+            db.question.create_index(
+                [("topic", 1), ("problem", 1), ("url", 1)],
+                unique=True, name="topic_problem_url", sparse=True
+            )
         except Exception:
             _dedupe_seeded_questions()
-            db.question.create_index([("topic", 1), ("problem", 1), ("url", 1)], unique=True)
-            
-        db.question.create_index([("problem", "text")], name="problem_text")
-        db.cohort.create_index("join_code", unique=True)
-        db.cohort_membership.create_index([("cohort_id", 1), ("user_id", 1)], unique=True)
+            db.question.create_index(
+                [("topic", 1), ("problem", 1), ("url", 1)],
+                unique=True, name="topic_problem_url", sparse=True
+            )
+
+        # ---- sheet ----
+        db.sheet.create_index("sheetId", unique=True)
+        db.sheet.create_index("name")
+
+        # ---- user_sheet_progress ----
+        db.user_sheet_progress.create_index(
+            [("userId", 1), ("sheetId", 1), ("questionId", 1)],
+            unique=True, name="userId_sheetId_questionId"
+        )
+        db.user_sheet_progress.create_index("userId")
+        db.user_sheet_progress.create_index("sheetId")
+        db.user_sheet_progress.create_index("questionId")
+        db.user_sheet_progress.create_index("status")
+        db.user_sheet_progress.create_index([("updatedAt", -1)])
+
+        # ---- submissions ----
+        db.submissions.create_index("user_id")
+        db.submissions.create_index("q_id")
+        db.submissions.create_index([("user_id", 1), ("q_id", 1)], name="user_id_q_id")
+        db.submissions.create_index("status")
+        db.submissions.create_index([("timestamp", -1)])
+        db.submissions.create_index("language")
+
+        # ---- cohort ----
+        db.cohort.create_index("join_code",  unique=True)
+        db.cohort.create_index("created_by")
+
+        # ---- cohort_membership ----
+        db.cohort_membership.create_index(
+            [("cohort_id", 1), ("user_id", 1)], unique=True, name="cohort_id_user_id"
+        )
         db.cohort_membership.create_index("user_id")
-        
-        # Lightweight schema backfill for legacy user documents.
-        db.user.update_many({"is_admin": {"$exists": False}}, {"$set": {"is_admin": False}})
+
+        # ---- Schema backfill for legacy documents ----
+        db.user.update_many({"is_admin":              {"$exists": False}}, {"$set": {"is_admin": False}})
+        db.user.update_many({"external_totals":       {"$exists": False}}, {"$set": {"external_totals": {}}})
+        db.user.update_many({"external_daily_counts": {"$exists": False}}, {"$set": {"external_daily_counts": {}}})
+        db.user.update_many({"platform_calendars":    {"$exists": False}}, {"$set": {"platform_calendars": {}}})
+        db.user.update_many({"in_sheet_platform_counts": {"$exists": False}}, {"$set": {"in_sheet_platform_counts": {
+            "LeetCode": 0, "GFG": 0, "Coding Ninjas": 0,
+            "HackerRank": 0, "AtCoder": 0, "Codewars": 0, "Other": 0
+        }}})
+        db.question.update_many({"companies":       {"$exists": False}}, {"$set": {"companies": []}})
+        db.question.update_many({"topics":          {"$exists": False}}, {"$set": {"topics": []}})
+        db.question.update_many({"examples":        {"$exists": False}}, {"$set": {"examples": []}})
+        db.question.update_many({"constraints":     {"$exists": False}}, {"$set": {"constraints": []}})
+        db.question.update_many({"similarQuestions":{"$exists": False}}, {"$set": {"similarQuestions": []}})
+        db.question.update_many({"hints":           {"$exists": False}}, {"$set": {"hints": []}})
+        db.question.update_many({"editorial_links": {"$exists": False}}, {"$set": {"editorial_links": []}})
+        db.question.update_many({"status":          {"$exists": False}}, {"$set": {"status": "published"}})
+        db.user_sheet_progress.update_many({"revision_status": {"$exists": False}}, {"$set": {"revision_status": "To Review"}})
+        db.user_sheet_progress.update_many({"bookmarked":       {"$exists": False}}, {"$set": {"bookmarked": False}})
     except Exception as exc:
         app.logger.warning(f"Database indexing or schema backfill failed: {exc}")
+
     data_path = Path(app.root_path).parent / "data.json"
     app._db_initialized = False
 
     def init_db():
+        from datetime import datetime, timezone as _tz
+        import re
         with data_path.open("r", encoding="utf-8") as file_obj:
             data = json.load(file_obj)
+
+        def _slug(text):
+            text = text.lower()
+            text = re.sub(r'[^a-z0-9]+', '-', text)
+            return text.strip('-')
+
         if not all(hasattr(collection, "bulk_write") for collection in (db.topic, db.question)):
             if db.topic.count_documents({}) == 0:
                 for topic in data:
-                    result = db.topic.insert_one({"name": topic["topicName"], "position": topic["position"]})
+                    result = db.topic.insert_one({
+                        "name": topic["topicName"],
+                        "position": topic["position"],
+                        "started": False,
+                        "doneQuestions": 0,
+                    })
                     topic_id = result.inserted_id
                     questions = []
-                    for question in topic["questions"]:
+                    for idx, question in enumerate(topic["questions"], start=1):
                         difficulty = question.get("difficulty", "Medium")
+                        title = question["Problem"]
                         q_data = {
+                            # New schema fields
+                            "questionId": idx,
+                            "titleSlug": _slug(title),
+                            "title": title,
+                            "content": "",
+                            "difficulty": difficulty,
+                            "topics": [topic["topicName"]],
+                            "companies": [],
+                            "examples": [],
+                            "constraints": [],
+                            "similarQuestions": [],
+                            "stats": {
+                                "totalAccepted": 0,
+                                "totalSubmissions": 0,
+                                "acceptanceRate": 0.0,
+                                "likes": 0,
+                                "dislikes": 0,
+                            },
+                            "status": "published",
+                            "createdAt": datetime.now(_tz.utc),
+                            "updatedAt": datetime.now(_tz.utc),
+                            # Legacy fields for tracker compatibility
                             "topic": topic_id,
-                            "problem": question["Problem"],
+                            "problem": title,
                             "url": question["URL"],
                             "url2": question.get("URL2", ""),
                             "editorial_links": question_editorial_links(question),
-                            "difficulty": difficulty,
+                            "hints": question.get("hints", []),
                         }
-                        if "hints" in question:
-                            q_data["hints"] = question["hints"]
                         questions.append(q_data)
                     if questions:
                         db.question.insert_many(questions)
@@ -210,7 +320,11 @@ def create_app(config_class=None):
             topic_updates.append(
                 UpdateOne(
                     {"name": topic["topicName"]},
-                    {"$set": {"position": topic["position"]}},
+                    {"$set": {
+                        "position": topic["position"],
+                        "started": False,
+                        "doneQuestions": 0,
+                    }},
                     upsert=True,
                 )
             )
@@ -218,8 +332,40 @@ def create_app(config_class=None):
             db.topic.bulk_write(topic_updates)
 
         topic_docs = {doc["name"]: doc["_id"] for doc in db.topic.find({}, {"name": 1})}
-        
+
         question_updates = []
+        # ----------------------------------------------------------------
+        # Pre-load ALL existing slugs so we can de-duplicate at build time.
+        # This prevents $setOnInsert from ever producing a slug that collides
+        # with an already-stored document or with another operation in the
+        # same batch (data.json has a handful of title duplicates).
+        # ----------------------------------------------------------------
+        _used_slugs: set[str] = {
+            d["titleSlug"]
+            for d in db.question.find(
+                {"titleSlug": {"$exists": True}}, {"titleSlug": 1, "_id": 0}
+            )
+            if d.get("titleSlug")
+        }
+
+        def _unique_slug(base: str) -> str:
+            """Return base slug if unused, otherwise base-2, base-3 …"""
+            candidate = base
+            suffix = 2
+            while candidate in _used_slugs:
+                candidate = f"{base}-{suffix}"
+                suffix += 1
+            _used_slugs.add(candidate)
+            return candidate
+
+        # Global question counter — start after the highest existing questionId
+        _max_id_doc = db.question.find_one(
+            {"questionId": {"$exists": True, "$type": "number"}},
+            {"questionId": 1},
+            sort=[("questionId", -1)],
+        )
+        _next_q_id = (_max_id_doc["questionId"] + 1) if _max_id_doc else 1
+
         for topic in data:
             topic_id = topic_docs.get(topic["topicName"])
             if not topic_id:
@@ -227,28 +373,69 @@ def create_app(config_class=None):
 
             for question in topic["questions"]:
                 difficulty = question.get("difficulty", "Medium")
+                title = question["Problem"]
+                # NOTE: titleSlug + questionId are in $setOnInsert only.
+                # They are written once on first insert and never touched again.
+                # Putting them in $set causes E11000 on re-seeding because the
+                # unique indexes reject writing the same value onto a second doc.
                 set_fields = {
+                    "title": title,
+                    "difficulty": difficulty,
+                    "topics": [topic["topicName"]],
+                    "status": "published",
+                    # Legacy fields
                     "url2": question.get("URL2", ""),
                     "editorial_links": question_editorial_links(question),
-                    "difficulty": difficulty,
+                    "hints": question.get("hints", []),
                 }
-                if "hints" in question:
-                    set_fields["hints"] = question["hints"]
+                # Only written on first insert — never overwrites enriched data
+                set_on_insert = {
+                    "questionId": _next_q_id,
+                    "titleSlug": _unique_slug(_slug(title)),  # collision-safe
+                    "content": "",
+                    "companies": [],
+                    "examples": [],
+                    "constraints": [],
+                    "similarQuestions": [],
+                    "stats": {
+                        "totalAccepted": 0,
+                        "totalSubmissions": 0,
+                        "acceptanceRate": 0.0,
+                        "likes": 0,
+                        "dislikes": 0,
+                    },
+                }
+                _next_q_id += 1  # always increment to avoid gaps
                 question_updates.append(
                     UpdateOne(
                         {
                             "topic": topic_id,
-                            "problem": question["Problem"],
                             "url": question["URL"],
                         },
                         {
-                            "$set": set_fields
+                            "$set": set_fields,
+                            "$setOnInsert": set_on_insert,
                         },
                         upsert=True,
                     )
                 )
+
         if question_updates:
-            db.question.bulk_write(question_updates)
+            from pymongo.errors import BulkWriteError as _BWE
+            try:
+                # ordered=False: don't abort the whole batch on a single
+                # collision — the remaining operations still execute.
+                db.question.bulk_write(question_updates, ordered=False)
+            except _BWE as bwe:
+                # Log individual failures as warnings; don't crash the app.
+                failed = len(bwe.details.get("writeErrors", []))
+                ok = len(question_updates) - failed
+                app.logger.warning(
+                    f"Question seeding: {ok} OK, {failed} skipped "
+                    f"(duplicate slug/id conflicts in data.json)"
+                )
+
+
 
     def _precompute_static_data(app):
         """Precompute static question/topic metadata and store in app config."""
@@ -269,17 +456,19 @@ def create_app(config_class=None):
 
         for q in questions:
             qid = str(q["_id"])
-            tid = str(q["topic"])
-            topic_question_count.setdefault(tid, []).append(qid)
+            tid = str(q.get("topic", ""))
+            if tid:
+                topic_question_count.setdefault(tid, []).append(qid)
             difficulty_map[qid] = q.get("difficulty", "Medium")
             all_questions_pc.append({
                 "_id": qid,
                 "topic": tid,
-                "problem": q.get("problem", ""),
+                "problem": q.get("problem", q.get("title", "")),
                 "url": q.get("url", ""),
                 "url2": q.get("url2", ""),
                 "difficulty": q.get("difficulty", "Medium"),
                 "editorial_links": q.get("editorial_links", []),
+                "marks": q.get("marks", 0),
             })
 
         topics_pc = [
@@ -302,7 +491,7 @@ def create_app(config_class=None):
             return None
 
         if not app._db_initialized:
-            init_db()
+            # init_db()  # Disabled: Prevents auto-repopulating 450 questions from data.json
             _precompute_static_data(app)
             app._db_initialized = True
 
@@ -368,6 +557,9 @@ def create_app(config_class=None):
     app.register_blueprint(admin_bp)
     app.register_blueprint(public_bp)
     app.register_blueprint(cohort_bp)
+    app.register_blueprint(practice_bp)
+    from app.sheet.routes import sheet_bp
+    app.register_blueprint(sheet_bp)
 
     @app.errorhandler(429)
     def ratelimit_handler(e):

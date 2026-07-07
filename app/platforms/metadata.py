@@ -1,4 +1,16 @@
 PLATFORM_META = {
+    "Sheet": {
+        "id": "sheet",
+        "name": "Practice Sheet",
+        "aliases": ("sheet", "practice sheet"),
+        "domains": ["/sheet/"],
+        "color_class": "primary",
+        "badge_class": "badge-link",
+        "brand_color": "#eff1f6",
+        "icon_class": "bi-file-earmark-code",
+        "profile_url_template": None,
+        "search_url": None
+    },
     "LeetCode": {
         "id": "leetcode",
         "name": "LeetCode",

@@ -26,11 +26,11 @@ def test_login_post_is_rate_limited_after_five_attempts(monkeypatch):
     assert "retry_after" in limited_response.get_json()
 
 
-def test_register_post_is_rate_limited_after_three_attempts(monkeypatch):
+def test_register_post_is_rate_limited_after_many_attempts(monkeypatch):
     flask_app, test_db = build_test_app(monkeypatch)
 
     with flask_app.test_client() as client:
-        for attempt in range(3):
+        for attempt in range(200):
             response = client.post(
                 "/register",
                 data={

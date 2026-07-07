@@ -1,0 +1,35 @@
+/*
+ * practice.css  –  Supplemental styles for the practice page.
+ * Core styles live in the <style> block inside templates/practice/index.html.
+ * This file only handles overrides from base.html / main.css leaking in.
+ */
+
+/* Ensure practice page takes full viewport without any inherited gutters */
+body.practice-page,
+.practice-page .main-content {
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: 100% !important;
+    overflow: hidden !important;
+}
+
+/* Hide global navigation chrome when on the practice page */
+.practice-page header,
+.practice-page .mobile-header,
+.practice-page .footer,
+.practice-page aside.sidebar {
+    display: none !important;
+}
+
+/* Scrollbar theming for webkit browsers */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #30363d; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #484f58; }
+
+/* Smooth transitions for interactive elements */
+* { box-sizing: border-box; }
+button, a, select, input { transition-property: background, color, border-color, opacity; transition-duration: 0.15s; }
+
+/* Ensure Monaco editor respects flex container */
+#monaco-editor .overflow-guard { border-radius: 0 !important; }

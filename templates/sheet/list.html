@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+
+{% block title %}Practice Sheets - 450 DSA{% endblock %}
+
+{% block content %}
+<style>
+.sheets-container {
+    max-width: 860px;
+    margin: 40px auto;
+    padding: 0 20px;
+    font-family: var(--font-sans);
+}
+.sheets-header {
+    margin-bottom: 28px;
+}
+.sheets-title {
+    color: var(--lc-t1);
+    font-size: 1.8rem;
+    font-weight: 800;
+    margin: 0 0 6px;
+}
+.sheets-subtitle {
+    color: var(--lc-t3);
+    font-size: 0.9rem;
+}
+.sheet-card {
+    display: block;
+    padding: 20px 24px;
+    background: #1e1e1e;
+    border-radius: 10px;
+    border: 1px solid #2a2a2a;
+    color: var(--lc-t1);
+    text-decoration: none;
+    transition: background 0.15s, border-color 0.15s, transform 0.1s;
+    margin-bottom: 14px;
+}
+.sheet-card:hover {
+    background: #252525;
+    border-color: #404040;
+    transform: translateY(-1px);
+}
+.sheet-card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+}
+.sheet-card-name {
+    font-size: 1.05rem;
+    font-weight: 700;
+    margin: 0;
+    flex: 1;
+}
+.sheet-card-count {
+    font-size: 0.82rem;
+    color: var(--lc-t3);
+    white-space: nowrap;
+    padding: 3px 10px;
+    border-radius: 12px;
+    background: #2a2a2a;
+    border: 1px solid #333;
+    flex-shrink: 0;
+}
+.sheet-card-desc {
+    color: var(--lc-t3);
+    font-size: 0.85rem;
+    margin-top: 6px;
+    line-height: 1.5;
+}
+.sheet-card-footer {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+.sheet-tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 9px;
+    border-radius: 8px;
+    font-size: 0.73rem;
+    font-weight: 600;
+    background: rgba(255,107,0,0.1);
+    color: var(--accent, #ff6b00);
+    border: 1px solid rgba(255,107,0,0.2);
+}
+.sheet-author {
+    font-size: 0.78rem;
+    color: var(--lc-t3);
+    margin-left: auto;
+}
+.empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--lc-t3);
+}
+.empty-state i { font-size: 2rem; margin-bottom: 12px; display: block; }
+</style>
+
+<div class="sheets-container">
+    <div class="sheets-header">
+        <h1 class="sheets-title">Practice Sheets</h1>
+        <p class="sheets-subtitle">Curated question sets to guide your DSA preparation.</p>
+    </div>
+
+    {% if sheets %}
+        {% for sheet in sheets %}
+        <a href="{{ url_for('sheet.sheet_view', sheet_id=sheet.slug) }}" class="sheet-card">
+            <div class="sheet-card-top">
+                <h2 class="sheet-card-name">{{ sheet.name }}</h2>
+                <span class="sheet-card-count">
+                    <i class="bi bi-list-check"></i>
+                    {{ sheet.total }} questions
+                </span>
+            </div>
+
+            {% if sheet.description %}
+            <p class="sheet-card-desc">{{ sheet.description }}</p>
+            {% else %}
+            <p class="sheet-card-desc">View all questions from {{ sheet.name }} →</p>
+            {% endif %}
+
+            <div class="sheet-card-footer">
+                {% for tag in sheet.tags[:4] %}
+                <span class="sheet-tag">{{ tag }}</span>
+                {% endfor %}
+                {% if sheet.author %}
+                <span class="sheet-author">by {{ sheet.author }}</span>
+                {% endif %}
+            </div>
+        </a>
+        {% endfor %}
+    {% else %}
+        <div class="empty-state">
+            <i class="bi bi-collection"></i>
+            <div style="font-size:1rem;margin-bottom:8px;">No sheets available yet.</div>
+            {% if current_user.is_authenticated and current_user.is_admin %}
+            <a href="{{ url_for('admin.import_sheet') }}" style="color:var(--accent);">
+                Import a sheet from Codolio →
+            </a>
+            {% endif %}
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

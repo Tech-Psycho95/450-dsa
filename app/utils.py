@@ -297,8 +297,20 @@ def get_merged_daily_counts(user_doc):
 
 def compute_c_score(user_doc, all_questions=None):
     """Compute composite C-Score (0-999) for a user document."""
+    from flask import current_app
+    if all_questions is None:
+        try:
+            all_questions = current_app.config["_PRECOMPUTED"]["all_questions"]
+        except (KeyError, RuntimeError):
+            all_questions = []
+
     progress = user_doc.get("progress", {})
     dsa_done = sum(1 for progress_item in progress.values() if progress_item.get("done"))
+    
+    dsa_marks_earned = sum(
+        q.get("marks", 0) for q in all_questions 
+        if str(q.get("_id")) in progress and progress[str(q.get("_id"))].get("done")
+    )
 
     ext = user_doc.get("external_totals", {})
     if not isinstance(ext, dict):
@@ -335,7 +347,12 @@ def compute_c_score(user_doc, all_questions=None):
     active_days = valid_external_days + len(extra_progress_days)
 
     total_sheet_questions = len(all_questions) if all_questions else 450
-    s_dsa = min(dsa_done / total_sheet_questions, 1.0) * 250
+    total_dsa_marks = sum(q.get("marks", 0) for q in all_questions) if all_questions else 0
+    if total_dsa_marks > 0:
+        s_dsa = min(dsa_marks_earned / total_dsa_marks, 1.0) * 250
+    else:
+        s_dsa = min(dsa_done / total_sheet_questions, 1.0) * 250
+        
     s_lc_total = min(lc_total / 500, 1.0) * 200
     s_lc_diff = min((lc_easy * 1 + lc_medium * 3 + lc_hard * 6) / 1500, 1.0) * 150
     s_lc_rating = min(lc_rating / 2500, 1.0) * 200
@@ -350,6 +367,7 @@ def compute_c_score(user_doc, all_questions=None):
     return {
         "c_score": c_score,
         "dsa_done": dsa_done,
+        "dsa_marks_earned": dsa_marks_earned,
         "lc_total": lc_total,
         "lc_easy": lc_easy,
         "lc_medium": lc_medium,
