@@ -199,6 +199,7 @@
         <th scope="col">User</th>
         <th scope="col">Score</th>
         <th scope="col">DSA Done</th>
+        <th scope="col">Marks</th>
         <th scope="col">Platforms</th>
       </tr>
     </thead>
@@ -233,6 +234,7 @@
             </td>
             <td class="score-cell" aria-label="C-Score: {{ entry.c_score }}">{{ entry.c_score }}</td>
             <td><span class="stat-badge dsa">{{ entry.dsa_done }} / 450</span></td>
+            <td><span class="stat-badge dsa">⭐ {{ entry.dsa_marks_earned if entry.dsa_marks_earned is defined else 0 }}</span></td>
             <td>
               {% if entry.lc_total %}
                 <span class="stat-badge lc" aria-label="LeetCode: {{ entry.lc_total }} solved">LC {{ entry.lc_total }}</span>

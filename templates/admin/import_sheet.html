@@ -1,0 +1,570 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+.import-header {
+    margin-bottom: 24px;
+}
+.import-title {
+    font-size: 1.7rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+}
+.import-subtitle {
+    color: var(--text-secondary);
+    font-size: 0.92rem;
+    margin-top: 4px;
+}
+
+/* Breadcrumb */
+.breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+    margin-bottom: 16px;
+}
+.breadcrumb a { color: var(--accent); text-decoration: none; }
+.breadcrumb a:hover { text-decoration: underline; }
+
+/* Card */
+.import-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 14px;
+    padding: 24px;
+    max-width: 780px;
+}
+
+/* Input section */
+.url-row {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    margin-top: 8px;
+}
+.url-input {
+    flex: 1;
+    min-width: 260px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-size: 0.92rem;
+}
+.url-input:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(255,107,0,0.12);
+}
+.url-input.error { border-color: #ef4444; }
+
+.btn-primary {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 10px 18px;
+    border-radius: 10px;
+    background: var(--accent);
+    color: #fff;
+    font-weight: 700;
+    font-size: 0.88rem;
+    border: none;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: opacity 0.15s;
+}
+.btn-primary:hover { opacity: 0.88; }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.btn-outline {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 10px 18px;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--text-secondary);
+    font-weight: 600;
+    font-size: 0.88rem;
+    border: 1px solid var(--border-color);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: border-color 0.15s, color 0.15s;
+}
+.btn-outline:hover { border-color: var(--accent); color: var(--accent); }
+
+/* Step indicators */
+.steps {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    margin: 20px 0 24px;
+}
+.step {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.83rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+.step-num {
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    border: 2px solid var(--border-color);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+.step.active .step-num { border-color: var(--accent); color: var(--accent); }
+.step.done .step-num { background: #22c55e; border-color: #22c55e; color: #fff; }
+.step-line {
+    flex: 1;
+    height: 2px;
+    background: var(--border-color);
+    margin: 0 10px;
+    min-width: 30px;
+}
+
+/* Loading */
+.loading-box {
+    display: none;
+    align-items: center;
+    gap: 10px;
+    padding: 14px;
+    border-radius: 10px;
+    background: rgba(255,107,0,0.06);
+    border: 1px solid rgba(255,107,0,0.2);
+    margin-top: 16px;
+    font-size: 0.88rem;
+    color: var(--accent);
+}
+.spinner {
+    width: 18px; height: 18px;
+    border: 2px solid rgba(255,107,0,0.3);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    flex-shrink: 0;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Alert boxes */
+.alert {
+    display: none;
+    padding: 12px 16px;
+    border-radius: 10px;
+    font-size: 0.88rem;
+    margin-top: 14px;
+    align-items: flex-start;
+    gap: 10px;
+}
+.alert.error  { background: rgba(239,68,68,0.08);  border: 1px solid rgba(239,68,68,0.3);  color: #f87171; display: flex; }
+.alert.success{ background: rgba(34,197,94,0.08);  border: 1px solid rgba(34,197,94,0.3);  color: #4ade80; display: flex; }
+.alert.info   { background: rgba(59,130,246,0.08); border: 1px solid rgba(59,130,246,0.3); color: #60a5fa; display: flex; }
+
+/* Preview box */
+.preview-box {
+    display: none;
+    margin-top: 20px;
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    overflow: hidden;
+}
+.preview-header {
+    padding: 14px 16px;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+.preview-title { font-weight: 700; font-size: 1rem; }
+.preview-meta  { font-size: 0.82rem; color: var(--text-secondary); }
+
+.preview-table { width: 100%; border-collapse: collapse; }
+.preview-table th, .preview-table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border-subtle);
+    text-align: left;
+    font-size: 0.86rem;
+}
+.preview-table th {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--text-secondary);
+    background: var(--bg-secondary);
+}
+.preview-table tr:last-child td { border-bottom: none; }
+
+.diff-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-size: 0.73rem;
+    font-weight: 700;
+}
+.diff-Easy   { background: rgba(34,197,94,0.12);  color: #4ade80; }
+.diff-Medium { background: rgba(234,179,8,0.12);  color: #facc15; }
+.diff-Hard   { background: rgba(239,68,68,0.12);  color: #f87171; }
+
+.more-label {
+    display: block;
+    text-align: center;
+    padding: 10px;
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+    background: var(--bg-secondary);
+}
+
+.action-row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    padding: 14px 16px;
+    background: var(--bg-secondary);
+    border-top: 1px solid var(--border-color);
+    flex-wrap: wrap;
+}
+
+/* Save result */
+.save-result {
+    display: none;
+    margin-top: 20px;
+}
+.stat-row { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 12px; }
+.stat-pill {
+    padding: 8px 14px;
+    border-radius: 10px;
+    font-size: 0.86rem;
+    font-weight: 700;
+    border: 1px solid var(--border-color);
+}
+.stat-pill.green  { border-color: #22c55e; color: #4ade80; background: rgba(34,197,94,0.08); }
+.stat-pill.orange { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+.stat-pill.gray   { color: var(--text-secondary); }
+
+/* How it works info */
+.info-panel {
+    margin-top: 24px;
+    padding: 16px;
+    border-radius: 10px;
+    background: rgba(59,130,246,0.06);
+    border: 1px solid rgba(59,130,246,0.2);
+    font-size: 0.84rem;
+    color: var(--text-secondary);
+    max-width: 780px;
+}
+.info-panel strong { color: var(--text-primary); }
+.info-panel ul { margin: 8px 0 0 16px; line-height: 1.9; }
+</style>
+
+<nav class="breadcrumb">
+    <a href="{{ url_for('admin.dashboard') }}">Admin</a>
+    <i class="bi bi-chevron-right" style="font-size:0.75rem"></i>
+    <span>Import Sheet</span>
+</nav>
+
+<div class="import-header">
+    <h1 class="import-title">Import Codolio Sheet</h1>
+    <p class="import-subtitle">Paste a Codolio sheet URL to scrape all questions and add them to the database.</p>
+</div>
+
+<!-- Step progress -->
+<div class="steps">
+    <div class="step active" id="step-1">
+        <span class="step-num">1</span> Enter URL
+    </div>
+    <div class="step-line"></div>
+    <div class="step" id="step-2">
+        <span class="step-num">2</span> Preview
+    </div>
+    <div class="step-line"></div>
+    <div class="step" id="step-3">
+        <span class="step-num">3</span> Save
+    </div>
+</div>
+
+<div class="import-card">
+    <label for="codolio-url" style="font-weight:600;font-size:0.9rem;">Codolio Sheet URL</label>
+    <p style="font-size:0.82rem;color:var(--text-secondary);margin:4px 0 10px;">
+        Example: <code>https://codolio.com/question-tracker/sheet/love-babbar-sheet</code>
+    </p>
+    <div class="url-row">
+        <input
+            type="url"
+            id="codolio-url"
+            class="url-input"
+            placeholder="https://codolio.com/question-tracker/sheet/..."
+            autocomplete="off"
+        >
+        <button class="btn-primary" id="preview-btn" onclick="startPreview()">
+            <i class="bi bi-search"></i> Fetch & Preview
+        </button>
+    </div>
+
+    <!-- Loading state -->
+    <div class="loading-box" id="loading-box">
+        <div class="spinner"></div>
+        <span id="loading-msg">Opening headless browser and scraping Codolio... this may take 15–30 seconds.</span>
+    </div>
+
+    <!-- Error alert -->
+    <div class="alert error" id="error-box" role="alert">
+        <i class="bi bi-exclamation-circle-fill" style="flex-shrink:0;margin-top:1px"></i>
+        <span id="error-msg"></span>
+    </div>
+
+    <!-- Preview -->
+    <div class="preview-box" id="preview-box">
+        <div class="preview-header">
+            <div>
+                <p class="preview-title" id="preview-sheet-name"></p>
+                <p class="preview-meta" id="preview-meta"></p>
+            </div>
+            <span id="source-badge" style="font-size:0.75rem;padding:3px 9px;border-radius:6px;background:var(--bg-card);border:1px solid var(--border-color);color:var(--text-secondary)"></span>
+        </div>
+
+        <div style="overflow-x:auto;">
+            <table class="preview-table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Title</th>
+                        <th>Difficulty</th>
+                        <th>Topics</th>
+                        <th>URL</th>
+                    </tr>
+                </thead>
+                <tbody id="preview-tbody"></tbody>
+            </table>
+        </div>
+        <span class="more-label" id="more-label" style="display:none"></span>
+
+        <div class="action-row">
+            <button class="btn-primary" id="save-btn" onclick="saveSheet()">
+                <i class="bi bi-database-fill-add"></i> Save to Database
+            </button>
+            <button class="btn-outline" onclick="resetImport()">
+                <i class="bi bi-arrow-counterclockwise"></i> Start Over
+            </button>
+            <span style="font-size:0.8rem;color:var(--text-secondary);margin-left:auto">
+                Existing questions will have topics &amp; companies merged — no duplicates.
+            </span>
+        </div>
+    </div>
+</div>
+
+<!-- Save result -->
+<div class="save-result" id="save-result">
+    <div class="alert success" id="save-ok-box">
+        <i class="bi bi-check-circle-fill" style="flex-shrink:0;margin-top:1px"></i>
+        <span id="save-ok-msg"></span>
+    </div>
+    <div class="stat-row" id="stat-row"></div>
+    <div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap;">
+        <a id="view-sheet-link" href="#" class="btn-primary">
+            <i class="bi bi-collection-fill"></i> View Sheet
+        </a>
+        <button class="btn-outline" onclick="resetImport()">Import Another</button>
+    </div>
+</div>
+
+<!-- Info panel -->
+<div class="info-panel">
+    <strong>How it works</strong>
+    <ul>
+        <li>A headless Chromium browser opens the Codolio page and intercepts the internal API calls.</li>
+        <li>Each question is upserted — existing questions have their <code>companies</code> and <code>topics</code> merged in.</li>
+        <li>New questions get a sequential <code>questionId</code> and are immediately visible in <code>/sheet/&lt;slug&gt;</code>.</li>
+        <li>Requires: <code>pip install playwright beautifulsoup4 &amp;&amp; playwright install chromium</code></li>
+    </ul>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// CSRF token required by the app's security middleware
+const CSRF_TOKEN = {{ csrf_token()|tojson }};
+let _pendingPreview = null;
+
+function _setStep(n) {
+    for (let i = 1; i <= 3; i++) {
+        const el = document.getElementById('step-' + i);
+        el.classList.remove('active', 'done');
+        if (i < n) el.classList.add('done');
+        else if (i === n) el.classList.add('active');
+    }
+}
+
+function _showError(msg) {
+    document.getElementById('error-msg').textContent = msg;
+    const box = document.getElementById('error-box');
+    box.style.display = 'flex';
+}
+
+function _hideAll() {
+    ['loading-box', 'error-box', 'preview-box', 'save-result'].forEach(id => {
+        document.getElementById(id).style.display = 'none';
+    });
+}
+
+async function startPreview() {
+    const url = document.getElementById('codolio-url').value.trim();
+    const input = document.getElementById('codolio-url');
+    input.classList.remove('error');
+    _hideAll();
+
+    if (!url) {
+        input.classList.add('error');
+        _showError('Please enter a Codolio sheet URL.');
+        return;
+    }
+
+    document.getElementById('preview-btn').disabled = true;
+    document.getElementById('loading-box').style.display = 'flex';
+    _setStep(2);
+
+    try {
+        const resp = await fetch('{{ url_for("admin.import_sheet_preview") }}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': CSRF_TOKEN
+            },
+            body: JSON.stringify({ url })
+        });
+        const data = await resp.json();
+        document.getElementById('loading-box').style.display = 'none';
+
+        if (!resp.ok || data.error) {
+            _showError(data.error || 'Scraping failed. Check that Playwright is installed.');
+            document.getElementById('preview-btn').disabled = false;
+            _setStep(1);
+            return;
+        }
+
+        _pendingPreview = data;
+        _renderPreview(data);
+
+    } catch (e) {
+        document.getElementById('loading-box').style.display = 'none';
+        _showError('Network error: ' + e.message);
+        document.getElementById('preview-btn').disabled = false;
+        _setStep(1);
+    }
+}
+
+function _renderPreview(data) {
+    document.getElementById('preview-sheet-name').textContent = data.sheet_name || data.sheet_slug;
+    document.getElementById('preview-meta').textContent =
+        `${data.total} questions found · Slug: ${data.sheet_slug}`;
+    document.getElementById('source-badge').textContent =
+        'Source: ' + (data.source === 'playwright_api' ? '✅ API' : '⚠️ HTML');
+
+    const tbody = document.getElementById('preview-tbody');
+    tbody.innerHTML = '';
+    (data.sample || []).forEach((q, i) => {
+        const tr = document.createElement('tr');
+        const urlCell = q.url
+            ? `<a href="${q.url}" target="_blank" rel="noopener" style="color:var(--accent);font-size:0.8rem">Open ↗</a>`
+            : '<span style="color:var(--text-secondary)">—</span>';
+        const topics = (q.topics || []).slice(0, 3).join(', ') || '—';
+        tr.innerHTML = `
+            <td style="color:var(--text-secondary)">${i + 1}</td>
+            <td style="font-weight:500">${_esc(q.title)}</td>
+            <td><span class="diff-badge diff-${q.difficulty}">${q.difficulty}</span></td>
+            <td style="font-size:0.8rem;color:var(--text-secondary)">${_esc(topics)}</td>
+            <td>${urlCell}</td>
+        `;
+        tbody.appendChild(tr);
+    });
+
+    const moreLabel = document.getElementById('more-label');
+    if (data.total > 10) {
+        moreLabel.style.display = 'block';
+        moreLabel.textContent = `… and ${data.total - 10} more questions`;
+    } else {
+        moreLabel.style.display = 'none';
+    }
+
+    document.getElementById('preview-box').style.display = 'block';
+    _setStep(2);
+}
+
+async function saveSheet() {
+    document.getElementById('save-btn').disabled = true;
+    document.getElementById('loading-msg').textContent = 'Saving questions to database…';
+    document.getElementById('loading-box').style.display = 'flex';
+    _setStep(3);
+
+    try {
+        const resp = await fetch('{{ url_for("admin.import_sheet_save") }}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': CSRF_TOKEN
+            }
+        });
+        const data = await resp.json();
+        document.getElementById('loading-box').style.display = 'none';
+
+        if (!resp.ok || data.error) {
+            _showError(data.error || 'Save failed.');
+            document.getElementById('save-btn').disabled = false;
+            return;
+        }
+
+        // Show success
+        document.getElementById('preview-box').style.display = 'none';
+        const result = document.getElementById('save-result');
+        result.style.display = 'block';
+
+        const okBox = document.getElementById('save-ok-box');
+        document.getElementById('save-ok-msg').textContent =
+            `Sheet "${_pendingPreview?.sheet_name}" saved successfully!`;
+        okBox.style.display = 'flex';
+
+        document.getElementById('stat-row').innerHTML = `
+            <div class="stat-pill green">✅ ${data.inserted} new questions inserted</div>
+            <div class="stat-pill orange">🔄 ${data.updated} existing questions updated</div>
+            ${data.skipped ? `<div class="stat-pill gray">⚠ ${data.skipped} skipped</div>` : ''}
+        `;
+
+        if (data.sheet_url) {
+            document.getElementById('view-sheet-link').href = data.sheet_url;
+        }
+        _setStep(3);
+
+    } catch (e) {
+        document.getElementById('loading-box').style.display = 'none';
+        _showError('Network error: ' + e.message);
+        document.getElementById('save-btn').disabled = false;
+    }
+}
+
+function resetImport() {
+    _pendingPreview = null;
+    document.getElementById('codolio-url').value = '';
+    document.getElementById('codolio-url').classList.remove('error');
+    document.getElementById('preview-btn').disabled = false;
+    document.getElementById('save-btn').disabled = false;
+    _hideAll();
+    _setStep(1);
+}
+
+function _esc(str) {
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+</script>
+{% endblock %}

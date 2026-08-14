@@ -6,7 +6,7 @@ def test_build_content_security_policy_uses_default_directives():
 
     assert policy.endswith(";")
     assert "default-src 'self';" in policy
-    assert "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com;" in policy
+    assert "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://unpkg.com https://cdnjs.cloudflare.com blob:;" in policy
     assert "https://code.jquery.com" not in policy
 
 
@@ -27,9 +27,11 @@ def test_default_csp_directives_keep_expected_origins():
         "'unsafe-inline'",
         "https://fonts.googleapis.com",
         "https://cdn.jsdelivr.net",
+        "https://cdnjs.cloudflare.com",
     ]
     assert DEFAULT_CSP_DIRECTIVES["font-src"] == [
         "'self'",
         "https://fonts.gstatic.com",
         "https://cdn.jsdelivr.net",
+        "https://cdnjs.cloudflare.com",
     ]

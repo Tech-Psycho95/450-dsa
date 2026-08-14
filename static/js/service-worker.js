@@ -1,4 +1,4 @@
-const CACHE_VERSION = "pwa-v1";
+const CACHE_VERSION = "pwa-v4";
 const OFFLINE_URL = "/static/offline.html";
 const PRECACHE_URLS = [
   OFFLINE_URL,

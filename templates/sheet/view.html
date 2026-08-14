@@ -1,0 +1,397 @@
+{% extends "base.html" %}
+
+{% block title %}{{ sheet_name }} - 450 DSA{% endblock %}
+
+{% block content %}
+<style>
+.sheet-container {
+    max-width: 1000px;
+    margin: 40px auto;
+    padding: 0 20px;
+    font-family: var(--font-sans);
+}
+.sheet-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+}
+.sheet-search {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+.search-input {
+    background: #2a2a2a;
+    border: 1px solid transparent;
+    color: var(--lc-t1);
+    padding: 8px 16px;
+    border-radius: 20px;
+    width: 250px;
+    font-size: 14px;
+    transition: background 0.2s, border 0.2s;
+}
+.search-input:focus {
+    outline: none;
+    border: 1px solid var(--lc-border);
+    background: #111;
+}
+.filter-btn {
+    background: #2a2a2a;
+    color: var(--lc-t2);
+    border: none;
+    height: 32px;
+    padding: 0 12px;
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    white-space: nowrap;
+}
+.filter-btn:hover {
+    background: #333;
+}
+.progress-text {
+    color: var(--lc-t2);
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.progress-circle {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 2px solid var(--lc-green);
+    border-top-color: #444; /* simple visual indicating partial */
+}
+
+.q-row {
+    display: flex;
+    align-items: center;
+    background: #1e1e1e;
+    padding: 14px 20px;
+    margin-bottom: 8px;
+    border-radius: 8px;
+    text-decoration: none;
+    color: inherit;
+    transition: background 0.15s;
+}
+.q-row:hover {
+    background: #2a2a2a;
+}
+.q-row.completed .q-title {
+    color: var(--lc-t2);
+    opacity: 0.8;
+}
+.q-status {
+    width: 24px;
+    color: var(--lc-green);
+    font-size: 14px;
+    flex-shrink: 0;
+}
+.q-title {
+    flex: 1;
+    color: var(--lc-t1);
+    font-size: 15px;
+    font-weight: 500;
+}
+.q-meta {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+}
+.q-acc {
+    color: var(--lc-t2);
+    font-size: 14px;
+    width: 45px;
+    text-align: right;
+}
+.q-diff {
+    font-size: 14px;
+    width: 40px;
+    text-align: left;
+}
+.diff-Easy { color: #00b8a3; }
+.diff-Med { color: #ffc01e; }
+.diff-Hard { color: #ff375f; }
+
+.q-actions {
+    color: var(--lc-t3);
+    font-size: 14px;
+    display: flex;
+    gap: 8px;
+}
+</style>
+
+<div class="sheet-container">
+    <div style="margin-bottom: 24px;">
+        <a href="{{ url_for('sheet.list_sheets') }}" style="color: var(--lc-t3); text-decoration: none; font-size: 14px;"><i class="bi bi-arrow-left"></i> All Sheets</a>
+        <h1 style="color: var(--lc-t1); margin: 8px 0 0 0;">{{ sheet_name }}</h1>
+    </div>
+
+    <div class="sheet-header">
+        <div class="sheet-search">
+            <div style="position: relative;">
+                <i class="bi bi-search" style="position: absolute; left: 14px; top: 10px; color: var(--lc-t3); font-size: 14px;"></i>
+                <input type="text" id="searchInput" class="search-input" placeholder="Search questions" style="padding-left: 36px;">
+            </div>
+            <button id="sortBtn" class="filter-btn" title="Sort by ID"><i class="bi bi-sort-numeric-down"></i> <span>ID</span></button>
+            <button id="filterBtn" class="filter-btn" title="Show All"><i class="bi bi-filter"></i> <span>All</span></button>
+        </div>
+        <div class="progress-text">
+            <div class="progress-circle"></div>
+            {{ total_solved }}/{{ total }} Solved
+            <i id="pickOneBtn" class="bi bi-shuffle" style="margin-left: 12px; cursor: pointer;" title="Pick One"></i>
+        </div>
+    </div>
+
+    <div class="q-list" id="qList">
+        {% for q in questions %}
+          <a href="{{ url_for('practice.practice_view', sheet_slug=sheet_slug, q_id=q.slug) }}" 
+           class="q-row {% if q.completed %}completed{% endif %}"
+           data-id="{{ q.display_id }}"
+           data-difficulty="{% if q.difficulty == 'Easy' %}1{% elif q.difficulty in ['Med.', 'Medium'] %}2{% else %}3{% endif %}"
+           data-acceptance="{{ q.acceptance if q.acceptance else '0%' }}"
+           data-completed="{{ 'true' if q.completed else 'false' }}">
+            <div class="q-status">
+                {% if q.completed %}
+                <i class="bi bi-check-lg"></i>
+                {% endif %}
+            </div>
+            <div class="q-title">{{ q.display_id }}. {{ q.title }}</div>
+            <div class="q-meta">
+                <div class="q-acc">{{ q.acceptance }}</div>
+                <div class="q-diff diff-{{ 'Med' if q.difficulty == 'Med.' else q.difficulty }}">{{ q.difficulty }}</div>
+                <div class="q-actions">
+                    <i class="bi {% if q.bookmarked %}bi-bookmark-fill{% else %}bi-bookmark{% endif %} bookmark-btn" 
+                       data-qid="{{ q.id }}" 
+                       data-bookmarked="{{ 'true' if q.bookmarked else 'false' }}"
+                       style="cursor: pointer; {% if q.bookmarked %}color: var(--lc-yellow);{% endif %}"
+                       title="Bookmark"></i>
+                </div>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+    
+    <div id="noResults" style="display: none; text-align: center; padding: 40px; color: var(--lc-t3);">
+        <i class="bi bi-search" style="font-size: 24px; margin-bottom: 12px; display: block;"></i>
+        <div style="font-size: 16px;">No questions found matching your search.</div>
+    </div>
+
+    <!-- Pagination Controls -->
+    <div class="pagination-controls" id="paginationControls" style="display: flex; justify-content: center; align-items: center; gap: 12px; margin-top: 24px;">
+        <button id="prevPageBtn" class="filter-btn" disabled><i class="bi bi-chevron-left"></i></button>
+        <span id="pageInfo" style="color: var(--lc-t2); font-size: 14px;">Page 1 of 1</span>
+        <button id="nextPageBtn" class="filter-btn"><i class="bi bi-chevron-right"></i></button>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const searchInput = document.getElementById('searchInput');
+    const sortBtn = document.getElementById('sortBtn');
+    const filterBtn = document.getElementById('filterBtn');
+    const pickOneBtn = document.getElementById('pickOneBtn');
+    const qList = document.getElementById('qList');
+    const noResults = document.getElementById('noResults');
+    
+    const prevPageBtn = document.getElementById('prevPageBtn');
+    const nextPageBtn = document.getElementById('nextPageBtn');
+    const pageInfo = document.getElementById('pageInfo');
+    
+    // Convert NodeList to Array for easier manipulation
+    let rows = Array.from(qList.querySelectorAll('.q-row'));
+    
+    // State
+    let currentSort = 'id'; // 'id', 'difficulty', 'acceptance'
+    let currentFilter = 'all'; // 'all', 'completed', 'incomplete'
+    let currentPage = 1;
+    const itemsPerPage = 20;
+    
+    // 1. Search functionality
+    searchInput.addEventListener('input', () => updateView(true));
+    
+    // 2. Sort functionality
+    sortBtn.addEventListener('click', () => {
+        if (currentSort === 'id') {
+            currentSort = 'difficulty';
+            sortBtn.innerHTML = '<i class="bi bi-bar-chart-fill"></i> <span>Difficulty</span>';
+            sortBtn.title = 'Sort by Difficulty';
+        } else if (currentSort === 'difficulty') {
+            currentSort = 'acceptance';
+            sortBtn.innerHTML = '<i class="bi bi-percent"></i> <span>Acceptance</span>';
+            sortBtn.title = 'Sort by Acceptance';
+        } else {
+            currentSort = 'id';
+            sortBtn.innerHTML = '<i class="bi bi-sort-numeric-down"></i> <span>ID</span>';
+            sortBtn.title = 'Sort by ID';
+        }
+        updateView(true);
+    });
+    
+    // 3. Filter functionality
+    filterBtn.addEventListener('click', () => {
+        if (currentFilter === 'all') {
+            currentFilter = 'incomplete';
+            filterBtn.innerHTML = '<i class="bi bi-circle"></i> <span>Incomplete</span>';
+            filterBtn.title = 'Show Incomplete';
+            filterBtn.style.color = 'var(--lc-t1)';
+        } else if (currentFilter === 'incomplete') {
+            currentFilter = 'completed';
+            filterBtn.innerHTML = '<i class="bi bi-check-circle-fill"></i> <span>Completed</span>';
+            filterBtn.title = 'Show Completed';
+            filterBtn.style.color = 'var(--lc-green)';
+        } else {
+            currentFilter = 'all';
+            filterBtn.innerHTML = '<i class="bi bi-filter"></i> <span>All</span>';
+            filterBtn.title = 'Show All';
+            filterBtn.style.color = '';
+        }
+        updateView(true);
+    });
+    
+    // Bookmark functionality
+    qList.addEventListener('click', async (e) => {
+        if (e.target.classList.contains('bookmark-btn')) {
+            e.preventDefault();
+            e.stopPropagation(); // prevent navigation
+            
+            const btn = e.target;
+            const qid = btn.dataset.qid;
+            const isBookmarked = btn.dataset.bookmarked === 'true';
+            const newStatus = !isBookmarked;
+            
+            // Optimistic update
+            btn.dataset.bookmarked = newStatus.toString();
+            if (newStatus) {
+                btn.classList.remove('bi-bookmark');
+                btn.classList.add('bi-bookmark-fill');
+                btn.style.color = 'var(--lc-yellow)';
+            } else {
+                btn.classList.remove('bi-bookmark-fill');
+                btn.classList.add('bi-bookmark');
+                btn.style.color = '';
+            }
+            
+            try {
+                const response = await fetch(`/practice/api/bookmark/${qid}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+                    body: JSON.stringify({ bookmark: newStatus, sheet_slug: "{{ sheet_slug }}" })
+                });
+                if (!response.ok) {
+                    throw new Error('Failed to save bookmark');
+                }
+            } catch (err) {
+                console.error(err);
+                alert("Please log in to save bookmarks.");
+                // Revert visual state
+                btn.dataset.bookmarked = isBookmarked.toString();
+                if (isBookmarked) {
+                    btn.classList.remove('bi-bookmark');
+                    btn.classList.add('bi-bookmark-fill');
+                    btn.style.color = 'var(--lc-yellow)';
+                } else {
+                    btn.classList.remove('bi-bookmark-fill');
+                    btn.classList.add('bi-bookmark');
+                    btn.style.color = '';
+                }
+            }
+        }
+    });
+    
+    // Pagination button clicks
+    prevPageBtn.addEventListener('click', () => {
+        if (currentPage > 1) {
+            currentPage--;
+            updateView(false);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+    });
+    
+    nextPageBtn.addEventListener('click', () => {
+        currentPage++;
+        updateView(false);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+    
+    // 4. Pick One functionality
+    pickOneBtn.addEventListener('click', () => {
+        if (rows.length > 0) {
+            const randomRow = rows[Math.floor(Math.random() * rows.length)];
+            window.location.href = randomRow.getAttribute('href');
+        } else {
+            alert('No questions available!');
+        }
+    });
+    
+    function updateView(resetPage = false) {
+        if (resetPage) currentPage = 1;
+        
+        const searchTerm = searchInput.value.toLowerCase();
+        
+        // Filter
+        let visibleRows = rows.filter(row => {
+            const title = row.querySelector('.q-title').textContent.toLowerCase();
+            const matchesSearch = title.includes(searchTerm);
+            
+            const isCompleted = row.dataset.completed === 'true';
+            const matchesFilter = 
+                currentFilter === 'all' || 
+                (currentFilter === 'completed' && isCompleted) ||
+                (currentFilter === 'incomplete' && !isCompleted);
+                
+            return matchesSearch && matchesFilter;
+        });
+        
+        // Sort
+        visibleRows.sort((a, b) => {
+            if (currentSort === 'id') {
+                return parseInt(a.dataset.id) - parseInt(b.dataset.id);
+            } else if (currentSort === 'difficulty') {
+                return parseInt(a.dataset.difficulty) - parseInt(b.dataset.difficulty) || parseInt(a.dataset.id) - parseInt(b.dataset.id);
+            } else if (currentSort === 'acceptance') {
+                const accA = parseFloat(a.dataset.acceptance.replace('%', '')) || 0;
+                const accB = parseFloat(b.dataset.acceptance.replace('%', '')) || 0;
+                return accB - accA || parseInt(a.dataset.id) - parseInt(b.dataset.id); // Higher acceptance first
+            }
+        });
+        
+        // Paginate
+        const totalPages = Math.ceil(visibleRows.length / itemsPerPage) || 1;
+        if (currentPage > totalPages) currentPage = totalPages;
+        
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        const endIndex = startIndex + itemsPerPage;
+        const paginatedRows = visibleRows.slice(startIndex, endIndex);
+        
+        // Render
+        qList.innerHTML = '';
+        if (visibleRows.length === 0) {
+            noResults.style.display = 'block';
+        } else {
+            noResults.style.display = 'none';
+            paginatedRows.forEach(row => qList.appendChild(row));
+        }
+        
+        // Update Controls
+        pageInfo.textContent = `Page ${currentPage} of ${totalPages} (${visibleRows.length} questions)`;
+        prevPageBtn.disabled = currentPage === 1;
+        nextPageBtn.disabled = currentPage === totalPages;
+        
+        // Hide pagination if all fit on one page
+        const paginationControls = document.getElementById('paginationControls');
+        paginationControls.style.display = totalPages <= 1 ? 'none' : 'flex';
+    }
+    
+    // Initial setup
+    updateView(true);
+});
+const csrfToken = {{ csrf_token()|tojson }};
+</script>
+{% endblock %}

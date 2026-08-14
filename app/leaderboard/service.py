@@ -30,7 +30,7 @@ def build_leaderboard_data():
         pre = current_app.config.get("_PRECOMPUTED")
     except RuntimeError:
         pre = None
-    all_questions = pre["all_questions"] if pre else list(db.question.find({}, {"url": 1}))
+    all_questions = pre["all_questions"] if pre else list(db.question.find({}, {"url": 1, "marks": 1}))
     entries = []
     for user in users:
         name = user.get("name", "Anonymous")

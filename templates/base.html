@@ -87,6 +87,10 @@
                 <span class="tooltip-label">Cohorts</span>
             </a>
             {% endif %}
+            <a href="{{ url_for('sheet.list_sheets') }}" class="sidebar-link {% if request.endpoint and request.endpoint.startswith('sheet.') %}active{% endif %}" id="nav-practice" aria-label="Practice">
+                <i class="bi bi-laptop" aria-hidden="true"></i>
+                <span class="tooltip-label">Practice</span>
+            </a>
             <a href="{{ url_for('search.search') }}" class="sidebar-link {% if request.endpoint == 'search.search' %}active{% endif %}" id="nav-search" aria-label="Search">
                 <i class="bi bi-search" aria-hidden="true"></i>
                 <span class="tooltip-label">Search</span>

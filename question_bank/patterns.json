@@ -1,0 +1,25 @@
+{
+  "arrays": {
+    "1": {
+      "name": "Two Sum",
+      "file_prefix": "01_two_sum",
+      "difficulty": "Easy",
+      "topics": ["Array", "Hash Table"],
+      "companies": ["Amazon", "Google", "Apple"]
+    },
+    "2": {
+      "name": "Set Matrix Zeroes",
+      "file_prefix": "02_set_matrix_zeroes",
+      "difficulty": "Medium",
+      "topics": ["Array", "Hash Table", "Matrix"],
+      "companies": ["Microsoft", "Amazon"]
+    },
+    "3": {
+      "name": "Reverse an Array",
+      "file_prefix": "03_reverse_array",
+      "difficulty": "Easy",
+      "topics": ["Array", "Two Pointers"],
+      "companies": ["Microsoft", "Adobe"]
+    }
+  }
+}

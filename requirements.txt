@@ -17,4 +17,3 @@ cachetools==5.3.3
 Flask-Caching==2.0.2
 flasgger==0.9.7.1
 gunicorn==22.0.0
-flask-mail==0.9.1
